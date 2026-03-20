@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meandr · Route Debug Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161820;
+    --border: #252830;
+    --accent: #4fffb0;
+    --accent2: #ff6b6b;
+    --accent3: #ffd166;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --card: #1c1f2a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  .logo span { color: var(--muted); }
+
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-value.warn { color: var(--accent3); }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  #map {
+    flex: 1;
+    height: 100%;
+  }
+
+  .sidebar {
+    width: 280px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 1;
+  }
+
+  .waypoint-list { padding: 8px; flex: 1; }
+
+  .wp-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+
+  .wp-card:hover, .wp-card.active {
+    border-color: var(--accent);
+    background: #1e2230;
+  }
+
+  .wp-index {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    float: right;
+    margin-top: 1px;
+  }
+
+  .wp-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 5px;
+    line-height: 1.3;
+    padding-right: 24px;
+  }
+
+  .wp-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #252830;
+    color: var(--muted);
+  }
+
+  .tag.green { background: #0d2e1e; color: var(--accent); }
+  .tag.red { background: #2e1212; color: var(--accent2); }
+  .tag.yellow { background: #2e2412; color: var(--accent3); }
+
+  .rejected-section {
+    border-top: 1px solid var(--border);
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+  }
+
+  .rejected-section .waypoint-list {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .rejected-section .sidebar-header {
+    color: var(--accent2);
+  }
+
+  .wp-card.rejected {
+    opacity: 0.6;
+  }
+
+  .wp-card.rejected:hover { opacity: 1; }
+
+  /* Google Maps info window override */
+  .gm-style .gm-style-iw-c {
+    background: var(--card) !important;
+    border-radius: 10px !important;
+    padding: 0 !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  }
+
+  .gm-style .gm-style-iw-d {
+    overflow: hidden !important;
+  }
+
+  .gm-style .gm-style-iw-t::after {
+    background: var(--card) !important;
+  }
+
+  .iw {
+    font-family: 'DM Sans', sans-serif;
+    min-width: 240px;
+    max-width: 280px;
+    color: #e8eaf0;
+  }
+
+  .iw-header {
+    background: #252830;
+    padding: 12px 14px 10px;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .iw-name {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    color: #fff;
+  }
+
+  .iw-address {
+    font-size: 11px;
+    color: #9ca3af;
+    line-height: 1.4;
+  }
+
+  .iw-body {
+    padding: 10px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: #1c1f2a;
+    border-radius: 0 0 10px 10px;
+  }
+
+  .iw-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  .iw-row-label {
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .iw-row-val {
+    font-weight: 600;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+  }
+
+  .iw-row-val.accent { color: #4fffb0; }
+  .iw-row-val.warn { color: #ffd166; }
+  .iw-row-val.danger { color: #ff6b6b; }
+
+  .stars {
+    color: #fbbf24;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  .iw-link {
+    display: block;
+    margin-top: 4px;
+    text-align: center;
+    padding: 7px;
+    background: #252830;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #4fffb0;
+    text-decoration: none;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.04em;
+    transition: background 0.15s;
+  }
+
+  .iw-link:hover { background: #2e3340; }
+
+  .iw-divider {
+    height: 1px;
+    background: #252830;
+    margin: 2px 0;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+  }
+
+  .status-dot.open { background: #4fffb0; }
+  .status-dot.closed { background: #ff6b6b; }
+  .status-dot.unknown { background: #6b7280; }
+
+  /* scrollbar */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .close-btn { display: none !important; }
+
+  .request-panel {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 100;
+    background: rgba(22, 24, 32, 0.95);
+    border: 1px solid #252830;
+    border-radius: 10px;
+    min-width: 220px;
+    max-width: 260px;
+    font-family: 'Space Mono', monospace;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  .request-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #252830;
+    cursor: pointer;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+    user-select: none;
+  }
+
+  .request-panel-header:hover { background: #2e3340; }
+
+  .request-panel-title { color: #4fffb0; }
+
+  .request-panel-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .rp-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-size: 11px;
+    gap: 8px;
+  }
+
+  .rp-label {
+    color: #6b7280;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    padding-top: 1px;
+  }
+
+  .rp-value {
+    color: #e8eaf0;
+    font-size: 11px;
+    text-align: right;
+    line-height: 1.4;
+  }
+
+  .rp-value.accent { color: #4fffb0; }
+  .rp-value.warn { color: #ffd166; }
+
+  .rp-divider {
+    height: 1px;
+    background: #252830;
+    margin: 2px 0;
+  }
+
+  .rp-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .rp-tag {
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: #1c1f2a;
+    color: #9ca3af;
+    border: 1px solid #252830;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">meandr<span>/debug</span></div>
+  <div class="stats-bar" id="statsBar">
+    <div class="stat">
+      <span class="stat-label">Waypoints</span>
+      <span class="stat-value" id="statWaypoints">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Total Detour</span>
+      <span class="stat-value" id="statDetour">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Budget Used</span>
+      <span class="stat-value" id="statBudget">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Scenic Score</span>
+      <span class="stat-value" id="statScenic">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Rejected</span>
+      <span class="stat-value warn" id="statRejected">—</span>
+    </div>
+    <button onclick="document.getElementById('pasteOverlay').style.display='flex'; document.getElementById('jsonInput').value=''; document.getElementById('requestInput').value=''; document.getElementById('requestPanel').style.display='none';" style="
+      background:#252830; border:1px solid #374151; color:#9ca3af;
+      font-family:'Space Mono',monospace; font-size:10px; padding:6px 14px;
+      border-radius:6px; cursor:pointer; letter-spacing:0.06em; margin-left:8px;
+    ">↺ New Route</button>
+  </div>
+</header>
+
+<div id="pasteOverlay" style="
+  position:fixed; inset:0; background:rgba(13,15,20,0.96); z-index:1000;
+  display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px;
+">
+  <div style="font-family:'Space Mono',monospace; color:#4fffb0; font-size:13px; letter-spacing:0.08em;">meandr / paste route data</div>
+  <div style="display:flex; gap:16px; align-items:flex-start;">
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="font-family:'Space Mono',monospace; font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em;">Request JSON <span style="color:#374151">(optional)</span></div>
+      <textarea id="requestInput" placeholder='Paste request JSON here (optional)...' style="
+        width:480px; height:320px; background:#161820; border:1px solid #252830;
+        border-radius:10px; color:#e8eaf0; font-family:'Space Mono',monospace; font-size:12px;
+        padding:14px; resize:vertical; outline:none; line-height:1.6;
+      "></textarea>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="font-family:'Space Mono',monospace; font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em;">Response JSON</div>
+      <textarea id="jsonInput" placeholder='Paste BeautifiedRouteResponseDto JSON here...' style="
+        width:480px; height:320px; background:#161820; border:1px solid #252830;
+        border-radius:10px; color:#e8eaf0; font-family:'Space Mono',monospace; font-size:12px;
+        padding:14px; resize:vertical; outline:none; line-height:1.6;
+      "></textarea>
+    </div>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <div id="pasteError" style="font-family:'Space Mono',monospace; font-size:11px; color:#ff6b6b; display:none;"></div>
+    <button onclick="loadSample()" style="
+      background:#252830; border:1px solid #374151; color:#9ca3af;
+      font-family:'Space Mono',monospace; font-size:11px; padding:8px 16px;
+      border-radius:6px; cursor:pointer; letter-spacing:0.05em;
+    ">Load Sample</button>
+    <button onclick="loadJson()" style="
+      background:#4fffb0; border:none; color:#0d0f14;
+      font-family:'Space Mono',monospace; font-size:12px; font-weight:700;
+      padding:10px 28px; border-radius:6px; cursor:pointer; letter-spacing:0.06em;
+    ">Render Route →</button>
+  </div>
+</div>
+
+<div class="main" style="position:relative;">
+  <div id="map"></div>
+  <div class="request-panel" id="requestPanel" style="display:none;">
+    <div class="request-panel-header" onclick="toggleRequestPanel()">
+      <span class="request-panel-title">Request Params</span>
+      <span id="requestPanelIcon">▼</span>
+    </div>
+    <div class="request-panel-body" id="requestPanelBody"></div>
+  </div>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span>Selected Waypoints</span>
+      <span id="selectedCount">0</span>
+    </div>
+    <div class="waypoint-list" id="selectedList"></div>
+    <div class="rejected-section">
+      <div class="sidebar-header" style="cursor:pointer;" onclick="toggleRejected()">
+        <span>Rejected</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="rejectedCount">0</span>
+          <span id="rejectedToggleIcon" style="font-size:10px;color:#6b7280;">▼</span>
+        </div>
+      </div>
+      <div class="waypoint-list" id="rejectedList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// GLOBALS
+// ============================================================
+let ROUTE_DATA = null;
+let REQUEST_DATA = null;
+let map, directionsService, directionsRenderer;
+let markers = [];
+let activeInfoWindow = null;
+let activeCard = null;
+let rejectedVisible = true;
+let requestPanelOpen = true;
+
+function toggleRejected() {
+  rejectedVisible = !rejectedVisible;
+  document.getElementById("rejectedList").style.display = rejectedVisible ? "block" : "none";
+  document.getElementById("rejectedToggleIcon").textContent = rejectedVisible ? "▼" : "▶";
+  markers.filter(m => m.id.startsWith("rej-")).forEach(m => m.marker.setVisible(rejectedVisible));
+}
+
+function toggleRequestPanel() {
+  requestPanelOpen = !requestPanelOpen;
+  document.getElementById("requestPanelBody").style.display = requestPanelOpen ? "flex" : "none";
+  document.getElementById("requestPanelIcon").textContent = requestPanelOpen ? "▼" : "▶";
+}
+
+const SAMPLE_DATA = {
+  summary: { waypointCount: 4, totalDetourMins: 45, totalBudgetMins: 120, actualScenicPercentage: 70.86 },
+  origin: { lat: 34.0522, lng: -118.2437, name: "Los Angeles, CA" },
+  destination: { lat: 36.1699, lng: -115.1398, name: "Las Vegas, NV" },
+  selectedWaypoints: [
+    { name: "Bradbury Building", placeId: "ChIJf1xJNJzHwoARwMHVHvbeFRA", address: "304 S Broadway, Los Angeles, CA 90013", lat: 34.0506, lng: -118.2479, rating: 4.7, userRatingsTotal: 8200, score: 0.91, detour: 8, openNow: true, businessStatus: "OPERATIONAL" },
+    { name: "Historic Barstow Main Street", placeId: "ChIJ7fFJCNgwwoARkUwK5z0DFXY", address: "Main St, Barstow, CA 92311", lat: 34.8958, lng: -117.0228, rating: 4.0, userRatingsTotal: 560, score: 0.72, detour: 14, openNow: true, businessStatus: "OPERATIONAL" },
+    { name: "The Mob Museum", placeId: "ChIJp4JiUCm3j4ARYfNouAL1x6o", address: "300 Stewart Ave, Las Vegas, NV 89101", lat: 36.1726, lng: -115.1414, rating: 4.8, userRatingsTotal: 14200, score: 0.96, detour: 9, openNow: true, businessStatus: "OPERATIONAL" },
+    { name: "Kiel Ranch Historic Site", placeId: "ChIJSfcXKiu3j4ARJuExcVGZT_M", address: "North Las Vegas, NV 89030", lat: 36.2044, lng: -115.1169, rating: 4.1, userRatingsTotal: 390, score: 0.67, detour: 16, openNow: true, businessStatus: "OPERATIONAL" }
+  ],
+  rejectedWaypoints: [
+    { name: "Calico Ghost Town", placeId: "ChIJabc123", address: "Yermo, CA 92398", lat: 34.9494, lng: -116.8664, rating: 4.3, userRatingsTotal: 5600, score: 0.48, detour: 45, openNow: true, businessStatus: "OPERATIONAL" }
+  ]
+};
+
+function loadSample() {
+  document.getElementById("jsonInput").value = JSON.stringify(SAMPLE_DATA, null, 2);
+}
+
+function loadJson() {
+  const raw = document.getElementById("jsonInput").value.trim();
+  const errEl = document.getElementById("pasteError");
+  errEl.style.display = "none";
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch(e) {
+    errEl.textContent = "Invalid JSON: " + e.message;
+    errEl.style.display = "block";
+    return;
+  }
+
+  if (!parsed.selectedWaypoints) {
+    errEl.textContent = "Missing 'selectedWaypoints' array in JSON.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  // Normalize BeautifiedRouteResponseDto shape:
+  // summary may be a nested TripSummary object, or absent (legacy/partial responses)
+  const s = parsed.summary || {};
+  ROUTE_DATA = {
+    summary: {
+      waypointCount:          s.waypointCount          || parsed.waypointCount || parsed.selectedWaypoints.length,
+      totalDetourMins:        s.additionalMeandrMins   || 0,
+      totalBudgetMins:        s.totalBudgetMins        || 0,
+      originalDurationMins:   s.originalDurationMins   || 0,
+      budgetUtilization:      s.budgetUtilization      || 0,
+      actualScenicPercentage: parsed.actualScenicPercentage || null,
+      requestedScenicPercentage: parsed.requestedScenicPercentage || null,
+      warningMessage:         parsed.warningMessage    || null
+    },
+    origin:      parsed.origin      || inferTerminal(parsed.selectedWaypoints, true),
+    destination: parsed.destination || inferTerminal(parsed.selectedWaypoints, false),
+    selectedWaypoints: parsed.selectedWaypoints,
+    rejectedWaypoints: parsed.rejectedWaypoints || []
+  };
+
+  // Parse optional request JSON
+  const rawRequest = document.getElementById("requestInput").value.trim();
+  if (rawRequest) {
+    try {
+      REQUEST_DATA = JSON.parse(rawRequest);
+    } catch(e) {
+      // non-fatal - just skip the panel
+      REQUEST_DATA = null;
+    }
+  } else {
+    REQUEST_DATA = null;
+  }
+
+  // Hide overlay and render
+  document.getElementById("pasteOverlay").style.display = "none";
+  clearMap();
+  populateStats();
+  renderSidebar();
+  renderRoute();
+  renderRequestPanel();
+}
+
+function inferTerminal(waypoints, isFirst) {
+  const wp = isFirst ? waypoints[0] : waypoints[waypoints.length - 1];
+  return wp ? { lat: wp.lat, lng: wp.lng, name: wp.name } : { lat: 0, lng: 0, name: "Unknown" };
+}
+
+function clearMap() {
+  markers.forEach(m => m.marker.setMap(null));
+  markers = [];
+  if (activeInfoWindow) { activeInfoWindow.close(); activeInfoWindow = null; }
+  directionsRenderer.setDirections({ routes: [] });
+  document.getElementById("selectedList").innerHTML = "";
+  document.getElementById("rejectedList").innerHTML = "";
+}
+
+// ============================================================
+// MAP + RENDERING LOGIC
+// ============================================================
+function renderRequestPanel() {
+  if (!REQUEST_DATA) return;
+  const r = REQUEST_DATA;
+  const panel = document.getElementById("requestPanel");
+  const body = document.getElementById("requestPanelBody");
+  panel.style.display = "block";
+
+  const originStr = r.origin ? `${r.origin.lat.toFixed(4)}, ${r.origin.lng.toFixed(4)}` : "—";
+  const destStr = r.destination ? `${r.destination.lat.toFixed(4)}, ${r.destination.lng.toFixed(4)}` : "—";
+  const prefs = r.entityPreferences || [];
+
+  body.innerHTML = `
+    <div class="rp-row">
+      <span class="rp-label">Origin</span>
+      <span class="rp-value">${originStr}</span>
+    </div>
+    <div class="rp-row">
+      <span class="rp-label">Dest</span>
+      <span class="rp-value">${destStr}</span>
+    </div>
+    <div class="rp-divider"></div>
+    <div class="rp-row">
+      <span class="rp-label">Trip Mins</span>
+      <span class="rp-value accent">${r.originalTripMins || r.originalDuration || "—"}</span>
+    </div>
+    <div class="rp-row">
+      <span class="rp-label">Threshold</span>
+      <span class="rp-value accent">${r.userThreshold || r.threshold || "—"}%</span>
+    </div>
+    <div class="rp-row">
+      <span class="rp-label">Radius</span>
+      <span class="rp-value">${r.radius ? (r.radius / 1000).toFixed(1) + " km" : "—"}</span>
+    </div>
+    <div class="rp-row">
+      <span class="rp-label">Dwell</span>
+      <span class="rp-value">${r.dwellTimePerStop != null ? r.dwellTimePerStop + " min" : "—"}</span>
+    </div>
+    <div class="rp-row">
+      <span class="rp-label">Highways</span>
+      <span class="rp-value ${r.avoidHighways ? 'warn' : 'accent'}">${r.avoidHighways ? "Avoided" : "Allowed"}</span>
+    </div>
+    ${r.scenicPercentage != null ? `
+    <div class="rp-row">
+      <span class="rp-label">Scenic %</span>
+      <span class="rp-value accent">${r.scenicPercentage}%</span>
+    </div>` : ""}
+    <div class="rp-divider"></div>
+    <div class="rp-label" style="margin-bottom:4px;">Entity Prefs</div>
+    <div class="rp-tags">
+      ${prefs.map(p => `<span class="rp-tag">${p.replace(/_/g, " ")}</span>`).join("")}
+    </div>
+  `;
+}
+
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 35.1, lng: -116.8 },
+    zoom: 7,
+    styles: darkMapStyle(),
+    disableDefaultUI: false,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    map,
+    suppressMarkers: true,
+    suppressInfoWindows: true,
+    polylineOptions: {
+      strokeColor: "#4fffb0",
+      strokeWeight: 3,
+      strokeOpacity: 0.85
+    }
+  });
+  // Map is ready; waiting for user to paste route data
+}
+
+function renderRoute() {
+  const selected = ROUTE_DATA.selectedWaypoints;
+  const waypts = selected.slice(1, selected.length - 1).map(wp => ({
+    location: new google.maps.LatLng(wp.lat, wp.lng),
+    stopover: true
+  }));
+
+  // Chunk if > 23 waypoints (Google limit is 25 total including origin/dest)
+  const chunks = chunkWaypoints(selected);
+  renderChunk(chunks, 0);
+}
+
+function chunkWaypoints(spots) {
+  const chunkSize = 23; // 23 middle + origin + dest = 25
+  const chunks = [];
+  for (let i = 0; i < spots.length - 1; i += chunkSize) {
+    const end = Math.min(i + chunkSize + 1, spots.length - 1);
+    chunks.push(spots.slice(i, end + 1));
+    if (end === spots.length - 1) break;
+  }
+  return chunks;
+}
+
+function renderChunk(chunks, idx) {
+  if (idx >= chunks.length) {
+    renderMarkers();
+    return;
+  }
+  const chunk = chunks[idx];
+  const waypts = chunk.slice(1, chunk.length - 1).map(wp => ({
+    location: new google.maps.LatLng(wp.lat, wp.lng),
+    stopover: true
+  }));
+
+  directionsService.route({
+    origin: new google.maps.LatLng(chunk[0].lat, chunk[0].lng),
+    destination: new google.maps.LatLng(chunk[chunk.length - 1].lat, chunk[chunk.length - 1].lng),
+    waypoints: waypts,
+    travelMode: google.maps.TravelMode.DRIVING
+  }, (result, status) => {
+    if (status === "OK") {
+      if (idx === 0) {
+        // Set directions before map attachment to ensure suppressMarkers is honored
+        directionsRenderer.setDirections(result);
+      } else {
+        const renderer = new google.maps.DirectionsRenderer({
+          suppressMarkers: true,
+          suppressInfoWindows: true,
+          polylineOptions: { strokeColor: "#4fffb0", strokeWeight: 3, strokeOpacity: 0.85 }
+        });
+        renderer.setDirections(result);
+        renderer.setMap(map);
+      }
+    }
+    renderChunk(chunks, idx + 1);
+  });
+}
+
+function renderMarkers() {
+  // Terminal markers - drawn once here, nowhere else
+  addTerminalMarker(ROUTE_DATA.origin, "A", "#4fffb0");
+  addTerminalMarker(ROUTE_DATA.destination, "B", "#4fffb0");
+
+  // Selected waypoint markers
+  ROUTE_DATA.selectedWaypoints.forEach((wp, i) => {
+    const marker = new google.maps.Marker({
+      position: { lat: wp.lat, lng: wp.lng },
+      map,
+      icon: markerIcon(i + 1, scoreColor(wp.score)),
+      title: wp.name,
+      zIndex: 10
+    });
+
+    const iw = new google.maps.InfoWindow({
+      content: buildInfoWindow(wp, i + 1, false),
+      maxWidth: 290
+    });
+
+    marker.addListener("click", () => {
+      if (activeInfoWindow) activeInfoWindow.close();
+      iw.open(map, marker);
+      activeInfoWindow = iw;
+      highlightCard("sel-" + i);
+    });
+
+    markers.push({ marker, iw, id: "sel-" + i });
+  });
+
+  // Rejected markers (dimmed)
+  ROUTE_DATA.rejectedWaypoints.forEach((wp, i) => {
+    const marker = new google.maps.Marker({
+      position: { lat: wp.lat, lng: wp.lng },
+      map,
+      icon: markerIcon("✕", "#ff6b6b", true),
+      title: wp.name + " (rejected)",
+      zIndex: 5,
+      opacity: 0.6
+    });
+
+    const iw = new google.maps.InfoWindow({
+      content: buildInfoWindow(wp, null, true),
+      maxWidth: 290
+    });
+
+    marker.addListener("click", () => {
+      if (activeInfoWindow) activeInfoWindow.close();
+      iw.open(map, marker);
+      activeInfoWindow = iw;
+    });
+
+    markers.push({ marker, iw, id: "rej-" + i });
+  });
+}
+
+function addTerminalMarker(loc, label, color) {
+  new google.maps.Marker({
+    position: { lat: loc.lat, lng: loc.lng },
+    map,
+    icon: terminalIcon(label, color),
+    title: loc.name,
+    zIndex: 20
+  });
+}
+
+function markerIcon(label, color, small = false) {
+  const size = small ? 22 : 28;
+  const fontSize = small ? 9 : 11;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + 8}" viewBox="0 0 ${size} ${size + 8}">
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 1}" fill="${color}" stroke="#0d0f14" stroke-width="2"/>
+      <line x1="${size/2}" y1="${size - 1}" x2="${size/2}" y2="${size + 7}" stroke="${color}" stroke-width="1.5"/>
+      <text x="${size/2}" y="${size/2 + fontSize/2 - 1}" text-anchor="middle" font-family="Space Mono, monospace" font-size="${fontSize}" font-weight="700" fill="#0d0f14">${label}</text>
+    </svg>`;
+  return {
+    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new google.maps.Size(size, size + 8),
+    anchor: new google.maps.Point(size / 2, size + 8)
+  };
+}
+
+function terminalIcon(label, color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">
+      <path d="M16 2 C8.3 2 2 8.3 2 16 C2 26 16 42 16 42 C16 42 30 26 30 16 C30 8.3 23.7 2 16 2 Z" fill="${color}" stroke="#0d0f14" stroke-width="2"/>
+      <text x="16" y="21" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" font-weight="700" fill="#0d0f14">${label}</text>
+    </svg>`;
+  return {
+    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new google.maps.Size(32, 44),
+    anchor: new google.maps.Point(16, 44)
+  };
+}
+
+// Scores from your service are raw (e.g. 17.54), not 0-1 decimals.
+// Normalize for coloring; display raw value as-is.
+function normalizeScore(score) {
+  return score > 1 ? score / 25.0 : score;
+}
+
+function buildInfoWindow(wp, index, isRejected) {
+  const stars = ratingStars(wp.rating);
+  const statusClass = wp.openNow ? "open" : (wp.businessStatus === "CLOSED_PERMANENTLY" ? "closed" : "unknown");
+  const statusText = wp.openNow ? "Open Now" : (wp.businessStatus === "CLOSED_PERMANENTLY" ? "Permanently Closed" : "Closed / Unknown");
+  const detourColor = wp.detour > 30 ? "danger" : wp.detour > 15 ? "warn" : "accent";
+  const ns = normalizeScore(wp.score);
+  const scoreColor_ = ns >= 0.75 ? "accent" : ns >= 0.55 ? "warn" : "danger";
+  const scoreDisplay = wp.score > 1 ? wp.score.toFixed(2) : (wp.score * 100).toFixed(1) + "%";
+  const mapsUrl = `https://www.google.com/maps/place/?q=place_id:${wp.placeId}`;
+  const indexLabel = index ? `#${index}` : "Rejected";
+
+  return `
+    <div class="iw">
+      <div class="iw-header">
+        <div class="iw-name">${wp.name}</div>
+        <div class="iw-address">${wp.address || ""}</div>
+      </div>
+      <div class="iw-body">
+        <div class="iw-row">
+          <span class="iw-row-label">Stop</span>
+          <span class="iw-row-val ${isRejected ? 'danger' : 'accent'}">${indexLabel}</span>
+        </div>
+        <div class="iw-row">
+          <span class="iw-row-label">Rating</span>
+          <span class="iw-row-val"><span class="stars">${stars}</span> ${wp.rating} <span style="color:#6b7280;font-size:10px">(${wp.userRatingsTotal.toLocaleString()})</span></span>
+        </div>
+        <div class="iw-row">
+          <span class="iw-row-label">Score</span>
+          <span class="iw-row-val ${scoreColor_}">${scoreDisplay}</span>
+        </div>
+        <div class="iw-row">
+          <span class="iw-row-label">Detour</span>
+          <span class="iw-row-val ${detourColor}">${wp.detour} min</span>
+        </div>
+        <div class="iw-divider"></div>
+        <div class="iw-row">
+          <span class="iw-row-label">Status</span>
+          <span class="iw-row-val"><span class="status-dot ${statusClass}"></span>${statusText}</span>
+        </div>
+        <a class="iw-link" href="${mapsUrl}" target="_blank">Open in Google Maps ↗</a>
+      </div>
+    </div>`;
+}
+
+function populateStats() {
+  const s = ROUTE_DATA.summary;
+  document.getElementById("statWaypoints").textContent = s.waypointCount;
+  document.getElementById("statDetour").textContent = s.totalDetourMins ? s.totalDetourMins.toFixed(0) + " min" : "—";
+  document.getElementById("statBudget").textContent = s.budgetUtilization
+    ? s.budgetUtilization.toFixed(1) + "% of " + s.totalBudgetMins.toFixed(0) + "m" : (s.totalBudgetMins ? s.totalBudgetMins + " min" : "—");
+  document.getElementById("statScenic").textContent = s.actualScenicPercentage
+    ? s.actualScenicPercentage.toFixed(1) + "%" : "—";
+  document.getElementById("statRejected").textContent = ROUTE_DATA.rejectedWaypoints.length;
+  document.getElementById("selectedCount").textContent = ROUTE_DATA.selectedWaypoints.length;
+  document.getElementById("rejectedCount").textContent = ROUTE_DATA.rejectedWaypoints.length;
+  if (s.warningMessage) {
+    const warn = document.createElement("div");
+    warn.style.cssText = "background:#2e1c0a;border:1px solid #7c3a00;color:#ffd166;font-family:'Space Mono',monospace;font-size:10px;padding:6px 12px;text-align:center;flex-shrink:0;";
+    warn.textContent = "⚠ " + s.warningMessage;
+    document.querySelector("header").after(warn);
+  }
+}
+
+function renderSidebar() {
+  const selList = document.getElementById("selectedList");
+  const rejList = document.getElementById("rejectedList");
+
+  ROUTE_DATA.selectedWaypoints.forEach((wp, i) => {
+    const card = buildSidebarCard(wp, i + 1, false, "sel-" + i);
+    selList.appendChild(card);
+  });
+
+  ROUTE_DATA.rejectedWaypoints.forEach((wp, i) => {
+    const card = buildSidebarCard(wp, null, true, "rej-" + i);
+    rejList.appendChild(card);
+  });
+}
+
+function buildSidebarCard(wp, index, isRejected, id) {
+  const div = document.createElement("div");
+  div.className = "wp-card" + (isRejected ? " rejected" : "");
+  div.id = "card-" + id;
+  const detourClass = wp.detour > 30 ? "red" : wp.detour > 15 ? "yellow" : "green";
+  const ns = normalizeScore(wp.score);
+  const scoreClass = ns >= 0.75 ? "green" : ns >= 0.55 ? "yellow" : "red";
+  const scoreDisplay = wp.score > 1 ? wp.score.toFixed(1) : (wp.score * 100).toFixed(0) + "%";
+
+  div.innerHTML = `
+    <span class="wp-index">${index ? "#" + index : "✕"}</span>
+    <div class="wp-name">${wp.name}</div>
+    <div class="wp-meta">
+      <span class="tag ${scoreClass}">score ${scoreDisplay}</span>
+      <span class="tag ${detourClass}">+${wp.detour}m</span>
+      <span class="tag">${wp.rating}★</span>
+    </div>`;
+
+  div.addEventListener("click", () => {
+    const entry = markers.find(m => m.id === id);
+    if (entry) {
+      map.panTo(entry.marker.getPosition());
+      map.setZoom(14);
+      if (activeInfoWindow) activeInfoWindow.close();
+      entry.iw.open(map, entry.marker);
+      activeInfoWindow = entry.iw;
+    }
+    highlightCard(id);
+  });
+
+  return div;
+}
+
+function highlightCard(id) {
+  if (activeCard) {
+    const prev = document.getElementById("card-" + activeCard);
+    if (prev) prev.classList.remove("active");
+  }
+  const curr = document.getElementById("card-" + id);
+  if (curr) {
+    curr.classList.add("active");
+    curr.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  activeCard = id;
+}
+
+function scoreColor(score) {
+  const ns = normalizeScore(score);
+  if (ns >= 0.75) return "#4fffb0";
+  if (ns >= 0.55) return "#ffd166";
+  return "#ff6b6b";
+}
+
+function ratingStars(rating) {
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5 ? 1 : 0;
+  return "★".repeat(full) + (half ? "½" : "") + "☆".repeat(5 - full - half);
+}
+
+function darkMapStyle() {
+  return [
+    { elementType: "geometry", stylers: [{ color: "#1a1c26" }] },
+    { elementType: "labels.text.stroke", stylers: [{ color: "#1a1c26" }] },
+    { elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
+    { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2d3a" }] },
+    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1a1c26" }] },
+    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3a3d4a" }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#d1d5db" }] },
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1117" }] },
+    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#374151" }] },
+    { featureType: "poi", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#2a2d3a" }] },
+    { featureType: "administrative.land_parcel", stylers: [{ visibility: "off" }] },
+    { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#161820" }] },
+    { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#1a1e1a" }] }
+  ];
+}
+</script>
+
+<!--
+  Replace YOUR_GOOGLE_MAPS_API_KEY below.
+  Spring Boot Thymeleaf injection is also supported - see README.
+-->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_MoPQbbqhTCUTxmjeVdq0zdPvgcngstc&callback=initMap">
+</script>
+
+</body>
+</html>

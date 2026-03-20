@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Meandr – Results</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal-deep:  #1B4D4A;
+    --teal-mid:   #2D6B5E;
+    --cream:      #F5E6C8;
+    --cream-dim:  #D4C5A0;
+    --coral:      #E8706A;
+    --coral-dark: #C85A54;
+    --tan:        #B5966E;
+    --surface:    rgba(22,61,58,0.92);
+    --surface2:   rgba(31,84,80,0.95);
+    --border:     rgba(245,230,200,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: 'DM Sans', sans-serif;
+    background: var(--teal-deep);
+    color: var(--cream);
+  }
+
+  /* ── MAP ── */
+  #resultsMap {
+    position: fixed; inset: 0; z-index: 0;
+  }
+
+  /* ── GRADIENT FADE at bottom so sheet blends in ── */
+  #resultsMapFade {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 220px;
+    background: linear-gradient(to top, rgba(27,77,74,0.85) 0%, transparent 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* ── BACK BUTTON ── */
+  #resultsBack {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 44px) + 8px);
+    left: 16px;
+    z-index: 10;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  /* ── BOTTOM SHEET ── */
+  #resultsSheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 5;
+    border-radius: 24px 24px 0 0;
+    background: var(--surface2);
+    border-top: 1.5px solid var(--border);
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+    /* collapsed: shows ~180px of summary */
+    transform: translateY(calc(100% - 180px - env(safe-area-inset-bottom, 0px)));
+    touch-action: none;
+  }
+
+  #resultsSheet.expanded {
+    transform: translateY(0);
+  }
+
+  /* drag handle */
+  .sheet-handle {
+    display: flex; justify-content: center;
+    padding: 12px 0 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .sheet-handle-bar {
+    width: 36px; height: 4px;
+    background: rgba(245,230,200,0.25);
+    border-radius: 2px;
+  }
+
+  /* ── SUMMARY STRIP ── */
+  .sheet-summary {
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 16px 14px;
+    flex-shrink: 0;
+  }
+  .summary-stat {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .summary-stat-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--coral); line-height: 1;
+  }
+  .summary-stat-label {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tan);
+  }
+  .summary-divider {
+    width: 1px; background: var(--border); align-self: stretch;
+  }
+
+  /* ── OPEN IN MAPS CTA ── */
+  .sheet-cta {
+    padding: 0 16px 10px;
+    flex-shrink: 0;
+  }
+  .btn-maps {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 13px;
+    background: var(--coral); color: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600;
+    border: none; border-radius: 14px; cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-maps:active { background: var(--coral-dark); transform: scale(0.98); }
+
+  /* ── SECTION LABEL ── */
+  .sheet-section-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--tan);
+    padding: 4px 16px 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── WAYPOINT CARDS SCROLL ── */
+  .sheet-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 12px calc(32px + env(safe-area-inset-bottom, 0px));
+    scrollbar-width: none;
+  }
+  .sheet-scroll::-webkit-scrollbar { display: none; }
+
+  .sheet-body {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 180px);
+    overflow: hidden;
+  }
+
+  /* ── WAYPOINT CARD ── */
+  .wp-card {
+    background: rgba(22,61,58,0.6);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .wp-card:active, .wp-card.active {
+    border-color: var(--coral);
+    background: rgba(232,112,106,0.08);
+  }
+
+  .wp-card-top {
+    display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
+  }
+  .wp-number {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--coral);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 700;
+    color: var(--cream); flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .wp-info { flex: 1; }
+  .wp-name {
+    font-size: 14px; font-weight: 600;
+    color: var(--cream); line-height: 1.3; margin-bottom: 3px;
+  }
+  .wp-address {
+    font-size: 11px; color: var(--cream-dim);
+    line-height: 1.4; opacity: 0.7;
+  }
+
+  .wp-tags {
+    display: flex; flex-wrap: wrap; gap: 5px;
+  }
+  .wp-tag {
+    font-size: 10px; font-weight: 500;
+    padding: 3px 8px; border-radius: 20px;
+    background: rgba(245,230,200,0.08);
+    border: 1px solid rgba(245,230,200,0.12);
+    color: var(--cream-dim);
+  }
+  .wp-tag.coral { color: var(--coral); border-color: rgba(232,112,106,0.3); background: rgba(232,112,106,0.08); }
+  .wp-tag.green { color: #6fcf97; border-color: rgba(111,207,151,0.3); background: rgba(111,207,151,0.08); }
+
+  /* ── INFO POPUP (floats above map) ── */
+  #wpPopup {
+    position: fixed;
+    left: 16px; right: 16px;
+    bottom: calc(190px + env(safe-area-inset-bottom, 0px));
+    z-index: 8;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    opacity: 0; pointer-events: none;
+    transform: translateY(8px);
+    transition: all 0.25s;
+  }
+  #wpPopup.show {
+    opacity: 1; pointer-events: all; transform: translateY(0);
+  }
+  .popup-name {
+    font-size: 15px; font-weight: 600;
+    color: var(--cream); margin-bottom: 4px;
+  }
+  .popup-address {
+    font-size: 11px; color: var(--cream-dim); opacity: 0.7;
+    margin-bottom: 10px; line-height: 1.4;
+  }
+  .popup-stats {
+    display: flex; gap: 12px; margin-bottom: 10px;
+  }
+  .popup-stat { display: flex; flex-direction: column; gap: 1px; }
+  .popup-stat-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px; font-weight: 700; color: var(--coral);
+  }
+  .popup-stat-label {
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--tan);
+  }
+  .popup-close {
+    position: absolute; top: 12px; right: 14px;
+    font-size: 18px; color: var(--cream-dim);
+    cursor: pointer; opacity: 0.5;
+    background: none; border: none;
+  }
+  .popup-maps-btn {
+    display: block; width: 100%; padding: 10px;
+    background: rgba(232,112,106,0.15);
+    border: 1px solid rgba(232,112,106,0.3);
+    border-radius: 10px;
+    font-size: 12px; font-weight: 600;
+    color: var(--coral); text-align: center;
+    text-decoration: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s;
+  }
+  .popup-maps-btn:active { background: rgba(232,112,106,0.25); }
+
+  /* ── FIXED-SIZE MARKER LABELS via OverlayView ── */
+  .map-wp-label {
+    position: absolute;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 600;
+    color: var(--cream);
+    background: rgba(27,77,74,0.82);
+    border: 1px solid rgba(245,230,200,0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    transform: translateX(14px) translateY(-50%);
+  }
+
+  /* Google autocomplete inside dark theme */
+  .pac-container {
+    background: #163D3A !important;
+    border: 1.5px solid rgba(245,230,200,0.15) !important;
+    border-radius: 12px !important;
+    font-family: 'DM Sans', sans-serif !important;
+  }
+  .pac-item { color: var(--cream-dim) !important; font-size: 13px !important; }
+  .pac-item-query { color: var(--cream) !important; }
+  .pac-icon { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="resultsMap"></div>
+<div id="resultsMapFade"></div>
+
+<!-- BACK BUTTON -->
+<div id="resultsBack" onclick="resultsGoBack()">←</div>
+
+<!-- INFO POPUP (above sheet) -->
+<div id="wpPopup">
+  <button class="popup-close" onclick="closePopup()">✕</button>
+  <div class="popup-name" id="popupName"></div>
+  <div class="popup-address" id="popupAddress"></div>
+  <div class="popup-stats">
+    <div class="popup-stat">
+      <span class="popup-stat-val" id="popupRating"></span>
+      <span class="popup-stat-label">Rating</span>
+    </div>
+    <div class="popup-stat">
+      <span class="popup-stat-val" id="popupDetour"></span>
+      <span class="popup-stat-label">Detour</span>
+    </div>
+    <div class="popup-stat">
+      <span class="popup-stat-val" id="popupReviews"></span>
+      <span class="popup-stat-label">Reviews</span>
+    </div>
+  </div>
+  <a class="popup-maps-btn" id="popupMapsLink" href="#" target="_blank">Open in Google Maps ↗</a>
+</div>
+
+<!-- BOTTOM SHEET -->
+<div id="resultsSheet">
+  <div class="sheet-handle" id="sheetHandle">
+    <div class="sheet-handle-bar"></div>
+  </div>
+
+  <!-- SUMMARY STRIP (always visible) -->
+  <div class="sheet-summary">
+    <div class="summary-stat">
+      <span class="summary-stat-val" id="sumWaypoints">—</span>
+      <span class="summary-stat-label">Stops</span>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat">
+      <span class="summary-stat-val" id="sumBaseline">—</span>
+      <span class="summary-stat-label">Base Trip</span>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat">
+      <span class="summary-stat-val" id="sumDetour">—</span>
+      <span class="summary-stat-label">Added</span>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat">
+      <span class="summary-stat-val" id="sumBudget">—</span>
+      <span class="summary-stat-label">Budget</span>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="sheet-cta">
+    <button class="btn-maps" id="openMapsBtn" onclick="openInGoogleMaps()">
+      🗺 Open Full Route in Maps
+    </button>
+  </div>
+
+  <!-- EXPANDABLE BODY -->
+  <div class="sheet-body">
+    <div class="sheet-section-label">Your Scenic Stops</div>
+    <div class="sheet-scroll" id="wpList"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────
+let resultsMap = null;
+let routeData  = null;
+let markers    = [];
+let labelOverlays = [];
+let activeCard = null;
+let popupTimer = null;
+let sheetExpanded = false;
+let touchStartY = 0;
+
+// ── ENTRY POINT called from index.html ────────────────────
+function showResults(data) {
+  routeData = data;
+  document.getElementById("resultsSheet").style.transform =
+    "translateY(calc(100% - 180px - env(safe-area-inset-bottom, 0px)))";
+  sheetExpanded = false;
+
+  populateSummary();
+  buildWaypointList();
+  initResultsMap();
+}
+
+// ── SUMMARY ───────────────────────────────────────────────
+function populateSummary() {
+  const s = routeData.summary || {};
+  document.getElementById("sumWaypoints").textContent = s.waypointCount || routeData.selectedWaypoints.length;
+  document.getElementById("sumBaseline").textContent  = s.originalDurationMins ? Math.round(s.originalDurationMins) + "m" : "—";
+  document.getElementById("sumDetour").textContent    = s.additionalMeandrMins ? "+" + Math.round(s.additionalMeandrMins) + "m" : "—";
+  document.getElementById("sumBudget").textContent    = s.budgetUtilization != null ? Math.round(s.budgetUtilization) + "%" : "—";
+}
+
+// ── WAYPOINT LIST ─────────────────────────────────────────
+function buildWaypointList() {
+  const list = document.getElementById("wpList");
+  list.innerHTML = "";
+  (routeData.selectedWaypoints || []).forEach((wp, i) => {
+    const card = document.createElement("div");
+    card.className = "wp-card";
+    card.id = "wp-card-" + i;
+
+    const detourTag = `<span class="wp-tag coral">+${wp.detour}m detour</span>`;
+    const ratingTag = wp.rating ? `<span class="wp-tag green">★ ${wp.rating}</span>` : "";
+    const distTag   = wp.distFromStart ? `<span class="wp-tag">${Math.round(wp.distFromStart)}mi in</span>` : "";
+
+    card.innerHTML = `
+      <div class="wp-card-top">
+        <div class="wp-number">${i + 1}</div>
+        <div class="wp-info">
+          <div class="wp-name">${wp.name}</div>
+          <div class="wp-address">${wp.address || ""}</div>
+        </div>
+      </div>
+      <div class="wp-tags">${detourTag}${ratingTag}${distTag}</div>`;
+
+    card.addEventListener("click", () => {
+      panToWaypoint(i);
+      showPopup(wp, i);
+      highlightCard(i);
+    });
+
+    list.appendChild(card);
+  });
+}
+
+// ── MAP INIT ──────────────────────────────────────────────
+function initResultsMap() {
+  resultsMap = new google.maps.Map(document.getElementById("resultsMap"), {
+    center: { lat: 34.5, lng: -100 },
+    zoom: 6,
+    styles: mapStyle(),
+    disableDefaultUI: true,
+    gestureHandling: "greedy",
+    zoomControl: false
+  });
+
+  // Draw route from masterPolyline
+  if (routeData.masterPolyline) {
+    const path = google.maps.geometry.encoding.decodePath(routeData.masterPolyline);
+
+    // White halo
+    new google.maps.Polyline({
+      path, map: resultsMap,
+      strokeColor: "#FFFFFF",
+      strokeWeight: 8,
+      strokeOpacity: 0.3,
+      zIndex: 1
+    });
+    // Blue route
+    new google.maps.Polyline({
+      path, map: resultsMap,
+      strokeColor: "#4285F4",
+      strokeWeight: 5,
+      strokeOpacity: 0.9,
+      zIndex: 2
+    });
+
+    // Fit bounds to polyline
+    const bounds = new google.maps.LatLngBounds();
+    path.forEach(p => bounds.extend(p));
+    resultsMap.fitBounds(bounds, { bottom: 200, top: 80, left: 40, right: 40 });
+  }
+
+  // Place markers + labels
+  (routeData.selectedWaypoints || []).forEach((wp, i) => {
+    const pos = new google.maps.LatLng(wp.lat, wp.lng);
+
+    const marker = new google.maps.Marker({
+      position: pos,
+      map: resultsMap,
+      icon: dotIcon(i + 1),
+      title: wp.name,
+      zIndex: 10
+    });
+
+    marker.addListener("click", () => {
+      panToWaypoint(i);
+      showPopup(wp, i);
+      highlightCard(i);
+    });
+
+    // Fixed-size label overlay
+    const label = makeFixedLabel(pos, wp.name, i);
+    markers.push({ marker, label });
+  });
+
+  // Origin / destination terminal markers
+  const wps = routeData.selectedWaypoints;
+  if (wps && wps.length > 0) {
+    // Use first/last waypoint coords as approximation if no explicit origin/dest
+    addTerminalDot(routeData.origin || { lat: wps[0].lat, lng: wps[0].lng }, "A");
+    addTerminalDot(routeData.destination || { lat: wps[wps.length-1].lat, lng: wps[wps.length-1].lng }, "B");
+  }
+
+  initSheetDrag();
+}
+
+// ── FIXED-SIZE LABEL OVERLAY ──────────────────────────────
+function makeFixedLabel(position, name, index) {
+  const truncated = name.length > 20 ? name.substring(0, 20).trimEnd() + "…" : name;
+
+  class FixedLabel extends google.maps.OverlayView {
+    constructor() { super(); this.div = null; }
+    onAdd() {
+      this.div = document.createElement("div");
+      this.div.className = "map-wp-label";
+      this.div.textContent = truncated;
+      this.getPanes().overlayLayer.appendChild(this.div);
+    }
+    draw() {
+      const proj = this.getProjection();
+      if (!proj || !this.div) return;
+      const pt = proj.fromLatLngToDivPixel(position);
+      if (!pt) return;
+      this.div.style.left = pt.x + "px";
+      this.div.style.top  = pt.y + "px";
+    }
+    onRemove() {
+      if (this.div && this.div.parentNode) this.div.parentNode.removeChild(this.div);
+      this.div = null;
+    }
+  }
+
+  const overlay = new FixedLabel();
+  overlay.setMap(resultsMap);
+  return overlay;
+}
+
+// ── MARKERS ───────────────────────────────────────────────
+function dotIcon(index) {
+  const size = 24;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + 6}" viewBox="0 0 ${size} ${size + 6}">
+    <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 1.5}" fill="#E8706A" stroke="#F5E6C8" stroke-width="1.5"/>
+    <line x1="${size/2}" y1="${size - 1}" x2="${size/2}" y2="${size + 5}" stroke="#E8706A" stroke-width="1.5"/>
+    <text x="${size/2}" y="${size/2 + 4}" text-anchor="middle"
+      font-family="DM Sans, sans-serif" font-size="10" font-weight="700" fill="#F5E6C8">${index}</text>
+  </svg>`;
+  return {
+    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new google.maps.Size(size, size + 6),
+    anchor: new google.maps.Point(size / 2, size + 6)
+  };
+}
+
+function addTerminalDot(loc, label) {
+  const size = 28;
+  const color = label === "A" ? "#4fffb0" : "#E8706A";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + 8}" viewBox="0 0 ${size} ${size + 8}">
+    <path d="M${size/2} 2 C${size*0.27} 2 2 ${size*0.27} 2 ${size/2} C2 ${size*0.8} ${size/2} ${size+6} ${size/2} ${size+6} C${size/2} ${size+6} ${size-2} ${size*0.8} ${size-2} ${size/2} C${size-2} ${size*0.27} ${size*0.73} 2 ${size/2} 2 Z"
+      fill="${color}" stroke="#0d0f14" stroke-width="1.5"/>
+    <text x="${size/2}" y="${size/2 + 5}" text-anchor="middle"
+      font-family="DM Sans, sans-serif" font-size="12" font-weight="700" fill="#0d0f14">${label}</text>
+  </svg>`;
+  new google.maps.Marker({
+    position: { lat: loc.lat, lng: loc.lng },
+    map: resultsMap,
+    icon: {
+      url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+      scaledSize: new google.maps.Size(size, size + 8),
+      anchor: new google.maps.Point(size / 2, size + 8)
+    },
+    zIndex: 20
+  });
+}
+
+// ── PAN + HIGHLIGHT ───────────────────────────────────────
+function panToWaypoint(i) {
+  const wp = routeData.selectedWaypoints[i];
+  resultsMap.panTo({ lat: wp.lat, lng: wp.lng });
+  resultsMap.setZoom(13);
+}
+
+function highlightCard(i) {
+  if (activeCard !== null) {
+    const prev = document.getElementById("wp-card-" + activeCard);
+    if (prev) prev.classList.remove("active");
+  }
+  const curr = document.getElementById("wp-card-" + i);
+  if (curr) {
+    curr.classList.add("active");
+    curr.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  activeCard = i;
+}
+
+// ── POPUP ─────────────────────────────────────────────────
+function showPopup(wp, i) {
+  document.getElementById("popupName").textContent    = wp.name;
+  document.getElementById("popupAddress").textContent = wp.address || "";
+  document.getElementById("popupRating").textContent  = wp.rating ? wp.rating.toFixed(1) : "—";
+  document.getElementById("popupDetour").textContent  = "+" + wp.detour + "m";
+  document.getElementById("popupReviews").textContent = wp.userRatingsTotal
+    ? (wp.userRatingsTotal >= 1000 ? (wp.userRatingsTotal/1000).toFixed(1) + "k" : wp.userRatingsTotal)
+    : "—";
+
+  const mapsUrl = wp.placeId
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wp.name)}&query_place_id=${wp.placeId}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wp.name)}`;
+  document.getElementById("popupMapsLink").href = mapsUrl;
+
+  document.getElementById("wpPopup").classList.add("show");
+}
+
+function closePopup() {
+  document.getElementById("wpPopup").classList.remove("show");
+  if (activeCard !== null) {
+    const c = document.getElementById("wp-card-" + activeCard);
+    if (c) c.classList.remove("active");
+    activeCard = null;
+  }
+}
+
+// ── OPEN IN GOOGLE MAPS ───────────────────────────────────
+function openInGoogleMaps() {
+  if (routeData.routeDebugUrl) {
+    // Extract the waypoints from routeDebugUrl and build a proper directions URL
+    const wps = (routeData.selectedWaypoints || []);
+    if (!wps.length) return;
+    const origin = routeData.origin || wps[0];
+    const dest   = routeData.destination || wps[wps.length - 1];
+    const waypointStr = wps.map(w =>
+      w.placeId ? `place_id:${w.placeId}` : `${w.lat},${w.lng}`
+    ).join("|");
+    const url = `https://www.google.com/maps/dir/?api=1`
+      + `&origin=${origin.lat},${origin.lng}`
+      + `&destination=${dest.lat},${dest.lng}`
+      + `&waypoints=${encodeURIComponent(waypointStr)}`
+      + `&travelmode=driving`;
+    window.open(url, "_blank");
+  }
+}
+
+// ── SHEET DRAG ────────────────────────────────────────────
+function initSheetDrag() {
+  const sheet  = document.getElementById("resultsSheet");
+  const handle = document.getElementById("sheetHandle");
+
+  handle.addEventListener("click", toggleSheet);
+
+  let startY = 0, startTranslate = 0, dragging = false;
+  const collapsedY = () => window.innerHeight - 180 - (parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue("--sab") || "0"));
+
+  sheet.addEventListener("touchstart", e => {
+    startY = e.touches[0].clientY;
+    dragging = true;
+  }, { passive: true });
+
+  sheet.addEventListener("touchmove", e => {
+    if (!dragging) return;
+    const dy = e.touches[0].clientY - startY;
+    if (sheetExpanded && dy < 0) return; // at top, don't scroll map
+    if (!sheetExpanded && dy > 0) return; // at bottom, don't go lower
+  }, { passive: true });
+
+  sheet.addEventListener("touchend", e => {
+    if (!dragging) return;
+    dragging = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (dy < -40) expandSheet();
+    else if (dy > 40) collapseSheet();
+  }, { passive: true });
+}
+
+function toggleSheet() {
+  sheetExpanded ? collapseSheet() : expandSheet();
+}
+
+function expandSheet() {
+  sheetExpanded = true;
+  document.getElementById("resultsSheet").style.transform = "translateY(0)";
+}
+
+function collapseSheet() {
+  sheetExpanded = false;
+  document.getElementById("resultsSheet").style.transform =
+    "translateY(calc(100% - 180px - env(safe-area-inset-bottom, 0px)))";
+  closePopup();
+}
+
+// ── BACK ──────────────────────────────────────────────────
+function resultsGoBack() {
+  closePopup();
+  collapseSheet();
+  // Wire to your showTripSetup() in index.html
+  if (typeof showTripSetup === "function") showTripSetup();
+}
+
+// ── MAP STYLE ─────────────────────────────────────────────
+function mapStyle() {
+  return [
+    { elementType:"geometry", stylers:[{color:"#1a3a37"}] },
+    { elementType:"labels.text.fill", stylers:[{color:"#8fb5ad"}] },
+    { elementType:"labels.text.stroke", stylers:[{color:"#0f2422"}] },
+    { featureType:"administrative", elementType:"geometry", stylers:[{color:"#2a5550"}] },
+    { featureType:"poi", elementType:"labels.text.fill", stylers:[{color:"#6b9e93"}] },
+    { featureType:"poi.park", elementType:"geometry", stylers:[{color:"#1e4d3f"}] },
+    { featureType:"road", elementType:"geometry", stylers:[{color:"#2d5e58"}] },
+    { featureType:"road", elementType:"geometry.stroke", stylers:[{color:"#163d3a"}] },
+    { featureType:"road", elementType:"labels.text.fill", stylers:[{color:"#8bb5ad"}] },
+    { featureType:"road.highway", elementType:"geometry", stylers:[{color:"#3d7a70"}] },
+    { featureType:"road.highway", elementType:"labels.text.fill", stylers:[{color:"#b5d4ce"}] },
+    { featureType:"transit", stylers:[{visibility:"off"}] },
+    { featureType:"water", elementType:"geometry", stylers:[{color:"#0f2e2b"}] },
+    { featureType:"water", elementType:"labels.text.fill", stylers:[{color:"#3d7070"}] },
+    { featureType:"landscape", elementType:"geometry", stylers:[{color:"#1a3a37"}] }
+  ];
+}
+</script>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key={{GOOGLE_API_KEY}}&libraries=geometry&callback=initResultsMap">
+</script>
+
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Route Visualization</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .info-panel {
+            position: absolute; top: 10px; left: 10px;
+            background: white; padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            max-width: 300px; z-index: 1000;
+        }
+        .info-panel h3 { margin: 0 0 10px 0; font-size: 16px; }
+        .info-panel p { margin: 5px 0; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="info-panel">
+        <h3>Route Details</h3>
+        <p><strong>Waypoints:</strong> <span id="waypointCount">23</span></p>
+        <p><strong>Total Detour:</strong> <span id="totalDetour">270.0</span> mins</p>
+        <p><strong>Budget Used:</strong> <span id="budgetUsed">540.0</span> mins</p>
+        <p><strong>Scenic:</strong> <span id="scenicPct">0.7086313750014225%</span></p>
+    </div>
+    <div id="map"></div>
+    <script>
+        const ROUTE_DATA = {
+            origin: {lat: 34.052335, lng: -118.243564},
+            destination: {lat: 36.169712, lng: -115.139925},
+            polyline: "czynEfmupUVa@}RiQrBmDzLmqAcsBk`Odo@ur~@cpBiwU~vAsvVj@ufDujZmlZydX|dLkfAitFcvXy_S{k_@cyVmgNotCuuOopQ_lJuqBwqBqwKckCsnGdl@sgMseDo|`@im\gi~@}qCysYycRmuZ_qIotEejUoua@_nSeo}@xXgwYmzt@}gRi|e@og`@sjc@eUc{FolCiY}}AbG_WjKnBdBgFtMhH}AvE{BqAXy@",
+            waypoints: [{lat: 34.096943, lng: -118.107495, name: "Mission San Gabriel Arcángel", rating: 4.7, userRatingsTotal: 1270, detour: 8, score: 17.54, address: "429 S Junipero Serra Dr, San Gabriel, CA 91776, USA"},
+                {lat: 34.119446, lng: -118.127512, name: "El Molino Viejo", rating: 4.7, userRatingsTotal: 147, detour: 11, score: 16.61, address: "1120 Old Mill Rd, San Marino, CA 91108, USA"},
+                {lat: 34.123714, lng: -118.158435, name: "Bissell House 1887", rating: 4.7, userRatingsTotal: 95, detour: 11, score: 16.41, address: "201 Orange Grove Ave, South Pasadena, CA 91030, USA"},
+                {lat: 34.022630, lng: -118.167605, name: "Whittier Boulevard Sign", rating: 4.7, userRatingsTotal: 80, detour: 11, score: 16.30, address: "4629 Whittier Blvd, East Los Angeles, CA 90022, USA"},
+                {lat: 34.094202, lng: -117.721485, name: "Claremont Packing House", rating: 4.6, userRatingsTotal: 2447, detour: 4, score: 17.65, address: "532 W 1st St floor 2, Claremont, CA 91711, USA"},
+                {lat: 34.110761, lng: -117.713958, name: "California Botanic Garden", rating: 4.7, userRatingsTotal: 641, detour: 6, score: 17.37, address: "1500 N College Ave, Claremont, CA 91711, USA"},
+                {lat: 34.049198, lng: -117.736342, name: "Sarvodaya Farms and Nursery", rating: 4.8, userRatingsTotal: 48, detour: 9, score: 16.53, address: "1196 S San Antonio Ave, Pomona, CA 91766, USA"},
+                {lat: 34.107250, lng: -117.651199, name: "Madonna of the Trail", rating: 4.6, userRatingsTotal: 147, detour: 10, score: 16.45, address: "1010 Euclid Ave, Upland, CA 91786, USA"},
+                {lat: 34.084043, lng: -117.766247, name: "Pomona Fairplex Grandstand", rating: 4.7, userRatingsTotal: 54, detour: 11, score: 16.28, address: "Pomona, CA 91768, USA"},
+                {lat: 34.064087, lng: -117.584129, name: "San Secondo d'Asti Catholic Church", rating: 4.8, userRatingsTotal: 508, detour: 5, score: 17.59, address: "250 N Turner Ave, Ontario, CA 91761, USA"},
+                {lat: 34.102919, lng: -117.540066, name: "The Root 66 Garden", rating: 4.9, userRatingsTotal: 21, detour: 8, score: 16.56, address: "12151 W Foothill Blvd, Rancho Cucamonga, CA 91739, USA"},
+                {lat: 34.208085, lng: -117.408848, name: "Glen Helen Regional Park", rating: 4.4, userRatingsTotal: 3070, detour: 0, score: 17.28, address: "2555 Glen Helen Pkwy, San Bernardino, CA 92407, USA"},
+                {lat: 34.203937, lng: -117.353453, name: "Sunset Sanctuary Farmstand", rating: 5.0, userRatingsTotal: 14, detour: 11, score: 16.78, address: "6764 Palm Ave, San Bernardino, CA 92407, USA"},
+                {lat: 34.332844, lng: -117.478192, name: "Baldy Mesa (Trestles) OHV Staging Area", rating: 4.6, userRatingsTotal: 147, detour: 7, score: 16.59, address: "Santa Fe Rd, Phelan, CA 92371, USA"},
+                {lat: 34.306370, lng: -117.466884, name: "Camp Cajon Monument", rating: 5.0, userRatingsTotal: 6, detour: 10, score: 16.46, address: "San Bernardino County, CA 92371, USA"},
+                {lat: 34.470150, lng: -117.317438, name: "Turf Green Express Artificial Grass", rating: 4.8, userRatingsTotal: 53, detour: 4, score: 16.85, address: "15865 Bear Valley Rd, Hesperia, CA 92345, USA"},
+                {lat: 34.886815, lng: -117.004079, name: "Western Terminus of Interstate 40", rating: 5.0, userRatingsTotal: 2, detour: 1, score: 16.44, address: "1533 Piute St, Barstow, CA 92311, USA"},
+                {lat: 34.875702, lng: -116.955936, name: "Route 66 EGA Monument", rating: 5.0, userRatingsTotal: 1, detour: 10, score: 16.28, address: "7 Quarters St, Barstow, CA 92311, USA"},
+                {lat: 34.904070, lng: -116.885802, name: "Jenny Rose Sign", rating: 4.8, userRatingsTotal: 12, detour: 2, score: 16.52, address: "35855 Ghost Town Rd, Yermo, CA 92398, USA"},
+                {lat: 35.266490, lng: -116.072793, name: "The World's Tallest Thermometer", rating: 4.4, userRatingsTotal: 1917, detour: 3, score: 17.87, address: "72157 Baker Blvd, Baker, CA 92309, USA"},
+                {lat: 35.740211, lng: -115.352304, name: "Airmail Navigation Arrow", rating: 5.0, userRatingsTotal: 2, detour: 1, score: 17.24, address: "PJRX+33, Borax, NV 89019, USA"},
+                {lat: 35.968287, lng: -115.231088, name: "Sieg’ s lookout", rating: 5.0, userRatingsTotal: 1, detour: 10, score: 17.19, address: "XQ99+8H, Enterprise, NV 89054, USA"},
+                {lat: 35.953286, lng: -115.179294, name: "Aviation Navigation Arrow", rating: 4.8, userRatingsTotal: 5, detour: 2, score: 17.06, address: "Henderson, NV 89044, USA"}]
+        };
+
+        function initMap() {
+            const path = google.maps.geometry.encoding.decodePath(ROUTE_DATA.polyline);
+            const bounds = new google.maps.LatLngBounds();
+            path.forEach(point => bounds.extend(point));
+
+            const map = new google.maps.Map(document.getElementById('map'), {
+                center: bounds.getCenter(),
+                zoom: 8,
+                mapTypeControl: true,
+                streetViewControl: true,
+                fullscreenControl: true
+            });
+
+            map.fitBounds(bounds);
+
+            new google.maps.Polyline({
+                path: path,
+                geodesic: true,
+                strokeColor: '#4285F4',
+                strokeOpacity: 0.8,
+                strokeWeight: 4,
+                map: map
+            });
+
+            new google.maps.Marker({
+                position: ROUTE_DATA.origin,
+                map: map,
+                title: 'Origin',
+                label: {text: 'A', color: 'white', fontWeight: 'bold'},
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: '#34A853',
+                    fillOpacity: 1,
+                    strokeColor: 'white',
+                    strokeWeight: 2
+                }
+            });
+
+            new google.maps.Marker({
+                position: ROUTE_DATA.destination,
+                map: map,
+                title: 'Destination',
+                label: {text: 'B', color: 'white', fontWeight: 'bold'},
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: '#EA4335',
+                    fillOpacity: 1,
+                    strokeColor: 'white',
+                    strokeWeight: 2
+                }
+            });
+
+            ROUTE_DATA.waypoints.forEach((waypoint, index) => {
+                const marker = new google.maps.Marker({
+                    position: {lat: waypoint.lat, lng: waypoint.lng},
+                    map: map,
+                    title: waypoint.name,  // Shows on hover
+                    label: {
+                        text: String(index + 1),  // Numbers: 1, 2, 3...
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '12px'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: '#FBBC04',
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 2
+                    }
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px;">
+                            <h4 style="margin: 0 0 8px 0;">${waypoint.name}</h4>
+                            <p style="margin: 4px 0; font-size: 13px;">
+                                <strong>Rating:</strong> ${waypoint.rating} ⭐ (${waypoint.userRatingsTotal} reviews)
+                            </p>
+                            <p style="margin: 4px 0; font-size: 13px;">
+                                <strong>Detour:</strong> ${waypoint.detour} mins
+                            </p>
+                            <p style="margin: 4px 0; font-size: 13px;">
+                                <strong>Score:</strong> ${waypoint.score.toFixed(2)}
+                            </p>
+                            <p style="margin: 4px 0; font-size: 12px; color: #666;">
+                                ${waypoint.address}
+                            </p>
+                        </div>
+                    `
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+            });
+        }
+    </script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_MoPQbbqhTCUTxmjeVdq0zdPvgcngstc&libraries=geometry&callback=initMap">
+    </script>
+</body>
+</html>

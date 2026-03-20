@@ -1,0 +1,64 @@
+[
+  {
+    "userName": "runner_pro",
+    "routeName": "Evening Sprint",
+    "stops": [
+      {
+        "placeId": "ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "placeName": "Ocean Beach Boardwalk",
+        "sequenceNumber": 1
+      },
+      {
+        "placeId": "ChIJVX9S_e-uEmsR_YtH8GsmV4s",
+        "placeName": "Cliff House Viewpoint",
+        "sequenceNumber": 2
+      },
+      {
+        "placeId": "ChIJ688_X6yuEmsR_YtH8GsmV4s",
+        "placeName": "Lands End Trailhead",
+        "sequenceNumber": 3
+      }
+    ]
+  },
+  {
+    "userName": "runner_pro",
+    "routeName": "Downtown Loop",
+    "stops": [
+      {
+        "placeId": "ChIJL7j_tDeuEmsRUsoyG83frY4",
+        "placeName": "Ferry Building",
+        "sequenceNumber": 1
+      },
+      {
+        "placeId": "ChIJdd4rk9dYwokR1-Y9Wv8Tf30",
+        "placeName": "Union Square",
+        "sequenceNumber": 2
+      },
+      {
+        "placeId": "ChIJm78p5dBYwokR3aX9Wv8Tf30",
+        "placeName": "Salesforce Park",
+        "sequenceNumber": 3
+      },
+      {
+        "placeId": "ChIJu46_tDeuEmsRUsoyG83frY4",
+        "placeName": "Embarcadero Pier",
+        "sequenceNumber": 4
+      }
+    ]
+  },
+  {
+    "userName": "runner_pro",
+    "routeName": "Park Path",
+    "stops": []
+  },
+  {
+    "userName": "runner_pro",
+    "routeName": "Bridge Crossing",
+    "stops": []
+  },
+  {
+    "userName": "runner_pro",
+    "routeName": "Track Workout",
+    "stops": []
+  }
+]
