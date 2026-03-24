@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 import java.util.List;
-import com.meandr.meandrDataServices.preferences.EntityPreferenceService.PreferenceEntry;
+import com.meandr.meandrDataServices.service.EntityPreferenceService.PreferenceEntry;
 
 // For creation / registration
 @Data

@@ -37,6 +37,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/Park.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/RouteStop.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/ScenicSpot.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/UserEntityPreference.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/UserRoute.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/UserStatus.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/Users.java
@@ -46,12 +47,10 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/osm/model/OsmSearchRequest.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/osm/service/OsmService.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/preferences/EntityCategory.java
-/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/preferences/EntityPreferenceRepository.java
-/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/preferences/EntityPreferenceService.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/preferences/EntitySource.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/preferences/PreferenceTier.java
-/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/preferences/UserEntityPreference.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/ClimbingGymRepository.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/EntityPreferenceRepository.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/ParkRepository.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/UserRouteRepository.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/UsersRepository.java
@@ -62,6 +61,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/security/JwtUtil.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/security/SecurityConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/service/ClimbingGymService.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/service/EntityPreferenceService.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/service/MapBoxRoutingService.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/service/ParkService.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/service/PlacesCacheService.java

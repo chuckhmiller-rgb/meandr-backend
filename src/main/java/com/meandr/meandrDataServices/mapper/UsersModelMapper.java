@@ -11,19 +11,17 @@ import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
+import org.springframework.web.bind.annotation.Mapping;
 
 /**
  *
  * @author chuck
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedSourcePolicy = ReportingPolicy.IGNORE)
 public interface UsersModelMapper {
-
-    // Converts DTO to Entity for new users
     Users toEntity(UsersRegistrationDto dto);
 
-    // Updates existing Entity from DTO (Partial Update logic)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntityFromDto(UsersUpdateDto dto, @MappingTarget Users entity);
-
 }

@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.meandr.meandrDataServices.repository.UsersRepository;
 import com.meandr.meandrDataServices.mapper.UsersModelMapper;
-import com.meandr.meandrDataServices.preferences.EntityPreferenceService;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;

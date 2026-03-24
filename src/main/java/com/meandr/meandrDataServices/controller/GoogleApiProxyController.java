@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -53,6 +54,20 @@ public class GoogleApiProxyController {
 
     @Value("${google.api.key}")
     private String apiKey;
+
+    private static final Set<String> EXCLUDED_PLACE_TYPES = Set.of(
+            "veterinary_care", "hospital", "doctor",
+            "dentist", "pharmacy", "lawyer", "real_estate_agency",
+            "insurance_agency", "bank", "atm", "police", "funeral_home",
+            "physiotherapist", "accounting", "storage", "moving_company",
+            "car_dealer", "car_repair", "car_wash", "laundry", "post_office"
+    );
+
+    private static final List<String> TYPE_PRIORITY = List.of(
+            "dog_park", "botanical_garden", "zoo", "aquarium", "campground",
+            "amusement_park", "art_gallery", "museum", "historical_landmark",
+            "national_park", "hiking_area", "tourist_attraction", "park"
+    );
 
     @Autowired
     private PlacesCacheService placesCacheService;
@@ -273,29 +288,13 @@ public class GoogleApiProxyController {
         log.info("MySQL cache miss — calling Google Places API near ({},{})", lat, lng);
 
         // --- Tier 2: Google Places API ---
-        Map<String, Object> locationRestriction = Map.of(
-                "circle", Map.of(
-                        "center", Map.of("latitude", lat, "longitude", lng),
-                        "radius", radius
-                )
-        );
-
         List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(entityTypes);
         if (googleTypes.isEmpty()) {
             log.warn("No mappable Google Places types for: {}", entityTypes);
             return Collections.emptyList();
         }
 
-        // Remove any overlap between included and excluded to avoid API rejection
-        List<String> allExcluded = List.of(
-                "funeral_home", "lawyer", "accounting",
-                "insurance_agency", "real_estate_agency", "storage",
-                "moving_company", "car_dealer", "car_repair", "car_wash",
-                "laundry", "bank", "atm", "post_office", "hospital",
-                "dentist", "doctor", "physiotherapist", "veterinary_care",
-                "police"
-        );
-        List<String> safeExcluded = allExcluded.stream()
+        List<String> safeExcluded = EXCLUDED_PLACE_TYPES.stream()
                 .filter(t -> !googleTypes.contains(t))
                 .collect(Collectors.toList());
 
@@ -303,7 +302,12 @@ public class GoogleApiProxyController {
                 "includedTypes", googleTypes,
                 "excludedTypes", safeExcluded,
                 "maxResultCount", 20,
-                "locationRestriction", locationRestriction
+                "locationRestriction", Map.of(
+                        "circle", Map.of(
+                                "center", Map.of("latitude", lat, "longitude", lng),
+                                "radius", radius
+                        )
+                )
         );
 
         HttpHeaders headers = new HttpHeaders();
@@ -313,21 +317,24 @@ public class GoogleApiProxyController {
                 "places.id,places.displayName,places.formattedAddress,places.types,"
                 + "places.location,places.rating,places.userRatingCount");
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
         try {
-            JsonNode response = restTemplate.postForObject(placesNearbyUrl, entity, JsonNode.class);
+            JsonNode response = restTemplate.postForObject(
+                    placesNearbyUrl,
+                    new HttpEntity<>(requestBody, headers),
+                    JsonNode.class
+            );
+
+            if (response == null || !response.has("places")) {
+                log.info("No scenic spots found near ({},{})", lat, lng);
+                return Collections.emptyList();
+            }
 
             List<ScenicSpot> spots = new ArrayList<>();
-            if (response != null && response.has("places")) {
-                for (JsonNode node : response.get("places")) {
-                    ScenicSpot spot = mapToScenicSpot(node);
-                    if (spot != null) {
-                        spots.add(spot);
-                    }
+            for (JsonNode node : response.get("places")) {
+                ScenicSpot spot = mapToScenicSpot(node);
+                if (spot != null) {
+                    spots.add(spot);
                 }
-            } else {
-                log.info("No scenic spots found near ({},{})", lat, lng);
             }
 
             // --- Backfill MySQL cache ---
@@ -339,32 +346,33 @@ public class GoogleApiProxyController {
             return spots;
 
         } catch (Exception e) {
-            log.error("Google API Error: {}", e.getMessage());
+            log.error("Google API error near ({},{}): {}", lat, lng, e.getMessage());
             return Collections.emptyList();
         }
     }
 
     private ScenicSpot mapToScenicSpot(JsonNode node) {
-        // 1. Name is usually inside displayName.text
+        // Check all types for excluded ones before mapping
+        if (node.has("types")) {
+            for (JsonNode typeNode : node.get("types")) {
+                if (EXCLUDED_PLACE_TYPES.contains(typeNode.asText())) {
+                    log.info("Excluding place '{}' due to type: {}",
+                            node.path("displayName").path("text").asText(), typeNode.asText());
+                    return null;
+                }
+            }
+        }
+
         String name = node.path("displayName").path("text").asText("Unknown Location");
         String address = node.path("formattedAddress").asText();
         String id = node.path("id").asText();
-
-        // 2. Note: 'openNow' is usually inside 'regularOpeningHours' in the new API
-        // If you aren't seeing it, you might need to check node.path("regularOpeningHours").path("openNow")
         boolean openNow = node.path("openNow").asBoolean();
-
         String businessStatus = node.path("businessStatus").asText();
         double rating = node.path("rating").asDouble(0.0);
-
-        // FIX: Google V1 uses 'userRatingCount', not 'userRatingTotal'
         int userRatingsTotal = node.path("userRatingCount").asInt(0);
-
-        // FIX: Google V1 uses 'latitude' and 'longitude' inside 'location'
         double lat = node.path("location").path("latitude").asDouble();
         double lng = node.path("location").path("longitude").asDouble();
 
-        // Create the object using the No-Args constructor and setters (via @Data)
         ScenicSpot spot = new ScenicSpot();
         spot.setName(name);
         spot.setAddress(address);
@@ -375,17 +383,24 @@ public class GoogleApiProxyController {
         spot.setUserRatingsTotal(userRatingsTotal);
         spot.setLat(lat);
         spot.setLng(lng);
-        // In mapToScenicSpot(), after setting other fields:
+
         if (node.has("types") && node.get("types").isArray() && node.get("types").size() > 0) {
-            spot.setEntityType(node.get("types").get(0).asText());
+            List<String> placeTypes = new ArrayList<>();
+            node.get("types").forEach(t -> placeTypes.add(t.asText()));
+            log.info("Place types for {}: {}", name, placeTypes);
+            String bestType = TYPE_PRIORITY.stream()
+                    .filter(placeTypes::contains)
+                    .findFirst()
+                    .orElse(placeTypes.get(0));
+            spot.setEntityType(bestType);
         }
 
-        // These will be populated later in the service loop
         spot.setScore(0.0);
         spot.setDetour(0);
         spot.setDistFromStart(0.0);
 
-        log.info("Mapped: {}, Rating: {}, Reviews: {}, EntityTypes: {}", name, rating, userRatingsTotal, spot.getEntityType());
+        log.info("Mapped: {}, Rating: {}, Reviews: {}, EntityType: {}",
+                name, rating, userRatingsTotal, spot.getEntityType());
         return spot;
     }
 }
