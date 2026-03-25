@@ -70,6 +70,7 @@ public class UsersService {
 
         // 2. Map DTO to Entity & Hash Password
         Users user = Users.builder()
+                .navigationApp(dto.getNavigationApp())
                 .username(dto.getUsername())
                 .email(dto.getEmail())
                 .passwordHash(passwordEncoder.encode(dto.getPassword())) // Hashing

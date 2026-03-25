@@ -27,6 +27,9 @@ public class Users {
     @Column(name = "user_id")
     private Long id;
 
+    @Column(name = "navigation_app", length = 20)
+    private String navigationApp;
+
     @Column(name = "username", length = 50, nullable = false, unique = true)
     private String username;
 

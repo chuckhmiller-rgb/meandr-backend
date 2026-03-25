@@ -25,6 +25,8 @@ import com.meandr.meandrDataServices.service.EntityPreferenceService.PreferenceE
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsersRegistrationDto {
+    
+    private String navigationApp;
 
     @NotBlank
     @Size(min = 3, max = 50)

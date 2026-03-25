@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class UsersResponseDto{
         //Long id;
+        String navigationApp;
         String username;
         String email;
         String firstName;
@@ -38,6 +39,7 @@ public class UsersResponseDto{
     public static UsersResponseDto fromEntity(Users user) {
         return new UsersResponseDto(
                 //user.getApplication_user_id(),
+                user.getNavigationApp(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getFirstName(),
