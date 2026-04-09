@@ -76,99 +76,104 @@ public class RouteBeautifierService {
             List<String> entityPreferences,
             boolean avoidHighways,
             boolean avoidTolls,
-            int dwellTimePerStop
+            int dwellTimePerStop,
+            List<List<Double>> selectedRouteCoords
     ) throws Exception {
 
-        final double maxAdditionalMinutes = routeEnhancementThreshold;
+        log.info("Beautifying route: maxAdditionalMinutes={}, avoidHighways={}, avoidTolls={}, hasSelectedCoords={}",
+                routeEnhancementThreshold, avoidHighways, avoidTolls,
+                selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
 
-        log.info("Beautifying route: maxAdditionalMinutes={}, avoidHighways={}, avoidTolls={}",
-                maxAdditionalMinutes, avoidHighways, avoidTolls);
+        List<CoordinateDto> routeCoords;
+        long baselineDurationMins;
+        String encodedPolyline;
 
-        com.google.maps.model.LatLng googleOrigin
-                = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
-        com.google.maps.model.LatLng googleDest
-                = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
+        if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
+            // Use pre-selected route coordinates from frontend
+            routeCoords = selectedRouteCoords.stream()
+                    .map(c -> new CoordinateDto(c.get(1), c.get(0))) // GeoJSON is [lng, lat]
+                    .collect(Collectors.toList());
+            baselineDurationMins = estimateDuration(routeCoords);
+            encodedPolyline = encodePolyline(routeCoords);
+            log.info("Using pre-selected route: {} coords, estimated {} mins", routeCoords.size(), baselineDurationMins);
+        } else {
+            // Fetch routes from Directions API
+            com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
+            com.google.maps.model.LatLng googleDest = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
 
-        // --- Step 1: Always fetch fastest route for reference ---
-        DirectionsResult fastestResult = DirectionsApi.newRequest(context)
-                .origin(googleOrigin)
-                .destination(googleDest)
-                .alternatives(false)
-                .mode(TravelMode.DRIVING)
-                .await();
+            // Always fetch fastest route for reference
+            DirectionsResult fastestResult = DirectionsApi.newRequest(context)
+                    .origin(googleOrigin).destination(googleDest)
+                    .alternatives(false).mode(TravelMode.DRIVING).await();
 
-        if (fastestResult.routes == null || fastestResult.routes.length == 0) {
-            throw new RuntimeException("No baseline route found between origin and destination");
+            if (fastestResult.routes == null || fastestResult.routes.length == 0) {
+                throw new RuntimeException("No baseline route found between origin and destination");
+            }
+
+            long fastestRouteMins = fastestResult.routes[0].legs[0].duration.inSeconds / 60;
+            log.info("Fastest route duration: {} mins", fastestRouteMins);
+
+            // Fetch base route with restrictions
+            DirectionsApiRequest baseRequest = DirectionsApi.newRequest(context)
+                    .origin(googleOrigin).destination(googleDest)
+                    .alternatives(true).mode(TravelMode.DRIVING);
+
+            List<DirectionsApi.RouteRestriction> restrictions = new ArrayList<>();
+            if (avoidHighways) {
+                restrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
+            }
+            if (avoidTolls) {
+                restrictions.add(DirectionsApi.RouteRestriction.TOLLS);
+            }
+            if (!restrictions.isEmpty()) {
+                baseRequest.avoid(restrictions.toArray(new DirectionsApi.RouteRestriction[0]));
+            }
+
+            DirectionsResult baseResult = baseRequest.await();
+            if (baseResult.routes == null || baseResult.routes.length == 0) {
+                throw new RuntimeException("No routes found for beautification");
+            }
+
+            baselineDurationMins = baseResult.routes[0].legs[0].duration.inSeconds / 60;
+            log.info("Base route duration: {} mins (fastest was {} mins)", baselineDurationMins, fastestRouteMins);
+
+            double enhancementPct = (routeEnhancementThreshold / baselineDurationMins) * 100.0;
+            double maxAcceptableMins = baselineDurationMins * (1 + enhancementPct / 100.0);
+
+            com.google.maps.model.DirectionsRoute selectedRoute = Arrays.stream(baseResult.routes)
+                    .filter(r -> (r.legs[0].duration.inSeconds / 60.0) <= maxAcceptableMins)
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException(String.format(
+                    "No routes available within your enhancement budget of %.0f mins.", maxAcceptableMins)));
+
+            log.info("Selected route: {} mins", selectedRoute.legs[0].duration.inSeconds / 60);
+            routeCoords = decodePolylineToCoordinates(selectedRoute.overviewPolyline.getEncodedPath());
+            encodedPolyline = selectedRoute.overviewPolyline.getEncodedPath();
         }
 
-        long fastestRouteMins = fastestResult.routes[0].legs[0].duration.inSeconds / 60;
-        log.info("Fastest route duration: {} mins", fastestRouteMins);
-
-        // --- Step 2: Fetch the base route to beautify ---
-        DirectionsApiRequest baseRequest = DirectionsApi.newRequest(context)
-                .origin(googleOrigin)
-                .destination(googleDest)
-                .alternatives(true)
-                .mode(TravelMode.DRIVING);
-
-        // Build restrictions list dynamically
-        List<DirectionsApi.RouteRestriction> restrictions = new ArrayList<>();
-        if (avoidHighways) {
-            restrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
-        }
-        if (avoidTolls) {
-            restrictions.add(DirectionsApi.RouteRestriction.TOLLS);
-        }
-        if (!restrictions.isEmpty()) {
-            baseRequest.avoid(restrictions.toArray(new DirectionsApi.RouteRestriction[0]));
-        }
-
-        DirectionsResult baseResult = baseRequest.await();
-
-        if (baseResult.routes == null || baseResult.routes.length == 0) {
-            throw new RuntimeException("No routes found for beautification");
-        }
-
-        // --- Step 3: Use the base route duration as the enhancement baseline ---
-        long baselineDurationMins = baseResult.routes[0].legs[0].duration.inSeconds / 60;
-        log.info("Base route duration (avoidHighways={}, avoidTolls={}): {} mins (fastest was {} mins)",
-                avoidHighways, avoidTolls, baselineDurationMins, fastestRouteMins);
-
-        // Convert absolute minutes to percentage of the base route duration
-        double enhancementPct = (maxAdditionalMinutes / baselineDurationMins) * 100.0;
+        double enhancementPct = (routeEnhancementThreshold / baselineDurationMins) * 100.0;
         log.info("Enhancement: {} additional mins = {}% of base route",
-                maxAdditionalMinutes, String.format("%.1f", enhancementPct));
-
-        // --- Step 4: Select the best route within enhancement budget ---
-        double maxAcceptableMins = baselineDurationMins * (1 + enhancementPct / 100.0);
-
-        com.google.maps.model.DirectionsRoute selectedRoute = Arrays.stream(baseResult.routes)
-                .filter(r -> (r.legs[0].duration.inSeconds / 60.0) <= maxAcceptableMins)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException(String.format(
-                "No routes available within your enhancement budget of %.0f mins. "
-                + "Try increasing your threshold.", maxAcceptableMins)));
-
-        long selectedRouteMins = selectedRoute.legs[0].duration.inSeconds / 60;
-        log.info("Selected route: {} mins (base: {} mins, max acceptable: {} mins)",
-                selectedRouteMins, baselineDurationMins, maxAcceptableMins);
-
-        // --- Step 5: Decode and beautify ---
-        List<CoordinateDto> routeCoords = decodePolylineToCoordinates(
-                selectedRoute.overviewPolyline.getEncodedPath()
-        );
-
+                routeEnhancementThreshold, String.format("%.1f", enhancementPct));
         log.info("Decoded route into {} coordinate points", routeCoords.size());
 
-        return beautifyRoute(
-                routeCoords,
-                baselineDurationMins,
-                enhancementPct,
-                radius,
-                entityPreferences,
-                dwellTimePerStop,
-                selectedRoute.overviewPolyline.getEncodedPath()
-        );
+        return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
+                radius, entityPreferences, dwellTimePerStop, encodedPolyline);
+    }
+
+    private long estimateDuration(List<CoordinateDto> coords) {
+        double totalKm = 0;
+        for (int i = 0; i < coords.size() - 1; i++) {
+            totalKm += haversine(coords.get(i).getLat(), coords.get(i).getLng(),
+                    coords.get(i + 1).getLat(), coords.get(i + 1).getLng());
+        }
+        return (long) (totalKm / 80.0 * 60.0);
+    }
+
+    private String encodePolyline(List<CoordinateDto> coords) {
+        List<com.google.maps.model.LatLng> points = coords.stream()
+                .map(c -> new com.google.maps.model.LatLng(c.getLat(), c.getLng()))
+                .collect(Collectors.toList());
+        return com.google.maps.internal.PolylineEncoding.encode(points);
     }
 
     /**
@@ -850,6 +855,7 @@ public class RouteBeautifierService {
             c.setDetourMinutes((double) s.getDetour());
             c.setDistFromStart(s.getDistFromStart());
             c.setEntityType(s.getEntityType());  // ← add this
+            c.setOpeningHoursJson(s.getOpeningHoursJson());
             return c;
         }).collect(Collectors.toList());
 
@@ -901,6 +907,7 @@ public class RouteBeautifierService {
                 spot.setPlaceId(sw.getId() != null ? sw.getId() : "osm_" + sw.getName().hashCode());
                 spot.setLat(sw.getLatitude() != null ? sw.getLatitude() : 0.0);
                 spot.setLng(sw.getLongitude() != null ? sw.getLongitude() : 0.0);
+                spot.setOpeningHoursJson(sw.getOpeningHoursJson());
                 spot.setRating(sw.getRating() != null ? sw.getRating() : 0.0);
                 spot.setUserRatingsTotal(sw.getUserRatingCount() != null ? sw.getUserRatingCount() : 0);
                 spot.setScore(sw.getScore());

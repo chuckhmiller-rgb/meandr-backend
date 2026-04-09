@@ -7,8 +7,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 
 @Slf4j
@@ -30,21 +28,16 @@ public class PlacesCacheService {
         spot.setUserRatingsTotal(rs.getInt("user_ratings_total"));
         spot.setEntityType(rs.getString("entity_type"));
         spot.setAddress(rs.getString("address"));
+        spot.setOpeningHoursJson(rs.getString("opening_hours_json"));
         return spot;
     };
 
-    /**
-     * Look up cached places within a bounding box, filtered by entity types,
-     * excluding expired entries.
-     */
     public List<ScenicSpot> findNearby(
             double lat,
             double lng,
             int radiusMeters,
             List<String> entityTypes
     ) {
-        // Bounding box pre-filter — rough but fast
-        // 1 degree lat ≈ 111km, 1 degree lng ≈ 111km * cos(lat)
         double latDelta = (radiusMeters / 1000.0) / 111.0;
         double lngDelta = (radiusMeters / 1000.0) / (111.0 * Math.cos(Math.toRadians(lat)));
 
@@ -58,7 +51,7 @@ public class PlacesCacheService {
 
         String sql = String.format("""
                 SELECT place_id, name, lat, lng, rating, user_ratings_total,
-                       entity_type, address
+                       entity_type, address, opening_hours_json
                 FROM places_cache
                 WHERE lat BETWEEN ? AND ?
                   AND lng BETWEEN ? AND ?
@@ -67,33 +60,27 @@ public class PlacesCacheService {
                 """, placeholders, CACHE_TTL_DAYS);
 
         Object[] params = buildParams(minLat, maxLat, minLng, maxLng, entityTypes);
-
         List<ScenicSpot> results = jdbcTemplate.query(sql, spotRowMapper, params);
         log.debug("Cache hit: {} spots near ({},{}) radius={}m", results.size(), lat, lng, radiusMeters);
         return results;
     }
 
-    /**
-     * Persist a list of spots returned from the Places API.
-     * Uses INSERT ... ON DUPLICATE KEY UPDATE to refresh rating and cached_at
-     * if the place already exists.
-     */
     public void saveAll(List<ScenicSpot> spots) {
         String sql = """
                 INSERT INTO places_cache
-                    (place_id, name, lat, lng, rating, user_ratings_total, entity_type, address, cached_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    (place_id, name, lat, lng, rating, user_ratings_total,
+                     entity_type, address, opening_hours_json, cached_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
-                    rating             = VALUES(rating),
-                    user_ratings_total = VALUES(user_ratings_total),
-                    cached_at          = NOW()
+                    rating              = VALUES(rating),
+                    user_ratings_total  = VALUES(user_ratings_total),
+                    opening_hours_json  = VALUES(opening_hours_json),
+                    cached_at           = NOW()
                 """;
 
         int saved = 0;
         for (ScenicSpot spot : spots) {
-            if (spot.getPlaceId() == null || spot.getPlaceId().isBlank()) {
-                continue;
-            }
+            if (spot.getPlaceId() == null || spot.getPlaceId().isBlank()) continue;
             jdbcTemplate.update(sql,
                     spot.getPlaceId(),
                     spot.getName(),
@@ -102,16 +89,14 @@ public class PlacesCacheService {
                     spot.getRating(),
                     spot.getUserRatingsTotal(),
                     spot.getEntityType(),
-                    spot.getAddress()
+                    spot.getAddress(),
+                    spot.getOpeningHoursJson()
             );
             saved++;
         }
         log.info("Saved {} spots to places_cache", saved);
     }
 
-    /**
-     * Purge all entries older than the TTL. Can be called from a scheduled job.
-     */
     public int purgeExpired() {
         String sql = "DELETE FROM places_cache WHERE cached_at < NOW() - INTERVAL ? DAY";
         int deleted = jdbcTemplate.update(sql, CACHE_TTL_DAYS);

@@ -65,8 +65,11 @@ public class GoogleApiProxyController {
 
     private static final List<String> TYPE_PRIORITY = List.of(
             "dog_park", "botanical_garden", "zoo", "aquarium", "campground",
-            "amusement_park", "art_gallery", "museum", "historical_landmark",
-            "national_park", "hiking_area", "tourist_attraction", "park"
+            "amusement_park", "art_gallery",
+            "restaurant", "fast_food_restaurant", "cafe", "bar", "bakery", "night_club",
+            "museum", "historical_landmark",
+            "national_park", "hiking_area", "park", "tourist_attraction",
+            "lodging", "gas_station" 
     );
 
     @Autowired
@@ -315,7 +318,7 @@ public class GoogleApiProxyController {
         headers.set("X-Goog-Api-Key", apiKey);
         headers.set("X-Goog-FieldMask",
                 "places.id,places.displayName,places.formattedAddress,places.types,"
-                + "places.location,places.rating,places.userRatingCount");
+                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours");
 
         try {
             JsonNode response = restTemplate.postForObject(
@@ -394,6 +397,12 @@ public class GoogleApiProxyController {
                     .orElse(placeTypes.get(0));
             spot.setEntityType(bestType);
         }
+
+        String openingHoursJson = null;
+        if (node.has("regularOpeningHours")) {
+            openingHoursJson = node.get("regularOpeningHours").toString();
+        }
+        spot.setOpeningHoursJson(openingHoursJson);
 
         spot.setScore(0.0);
         spot.setDetour(0);

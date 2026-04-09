@@ -78,7 +78,8 @@ public class RouteBeautifierController {
                 request.getEntityPreferences(),
                 request.isAvoidHighways(),
                 request.isAvoidTolls(),
-                request.getDwellTimePerStop()
+                request.getDwellTimePerStop(),
+                request.getSelectedRouteCoords()
         );
 
         return ResponseEntity.ok(response);
