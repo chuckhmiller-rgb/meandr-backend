@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Scores and interleaves Google Places and OSM waypoints into a single ranked list.
@@ -22,6 +23,7 @@ import lombok.NoArgsConstructor;
 @Data // Generates getters, setters, equals, hashCode, and toString automatically
 @AllArgsConstructor // Generates constructor for all fields
 @Service
+@Slf4j
 public class WaypointScoringService {
 
     // ── Configuration ────────────────────────────────────────────────────────
@@ -29,11 +31,17 @@ public class WaypointScoringService {
     /** OSM share of final interleaved list. Google Places gets (1 - OSM_BIAS). */
     private static final double OSM_BIAS = 0.6;
 
-    /** Detour penalty: points deducted per minute of added detour time. */
+    /** Detour penalty: points deducted per minute of added detour time. 
     private static final double DETOUR_PENALTY_PER_MINUTE = 3.0;
 
+    /** Maximum detour minutes before score floors at 0. 
+    private static final double MAX_DETOUR_MINUTES = 30.0;*/
+    
+    /** trying lower detour penalty settings  */
+    private static final double DETOUR_PENALTY_PER_MINUTE = 1.0;
+
     /** Maximum detour minutes before score floors at 0. */
-    private static final double MAX_DETOUR_MINUTES = 30.0;
+    private static final double MAX_DETOUR_MINUTES = 60.0;
 
     // ── OSM Proxy Score Weights ───────────────────────────────────────────────
 
@@ -47,7 +55,7 @@ public class WaypointScoringService {
     // Detour penalty is shared constant above
 
     /** Elevation above which a peak is considered "highly notable" (metres). */
-    private static final double PEAK_ELEVATION_NOTABLE = 3000.0;
+    private static final double PEAK_ELEVATION_NOTABLE = 2000.0;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -95,6 +103,8 @@ public class WaypointScoringService {
             Map<String, Double> prefWeights) {
 
         if (candidates == null || candidates.isEmpty()) return Collections.emptyList();
+        
+        log.info("Scoring Google Places ...");
 
         // Find max raw quality for normalization
         double maxRaw = candidates.stream()
@@ -106,7 +116,10 @@ public class WaypointScoringService {
             double quality  = (rawGoogleQuality(c) / Math.max(maxRaw, 0.001)) * 70.0;
             double prefBonus = prefBonus(c.getEntityType(), prefWeights, 20.0);
             double penalty  = detourPenalty(c.getDetourMinutes());
-            double score    = Math.max(0, Math.min(100, quality + prefBonus - penalty));
+            double score    = Math.min(100, quality + prefBonus - penalty);
+            
+            
+            log.info("Google place: " + c.getName() + " overall meandr score: " + score + " quality = " + quality + " prefBonus = " + prefBonus + " penalty = " + penalty);
 
             result.add(ScoredWaypoint.fromGoogle(c, score));
         }
@@ -172,7 +185,7 @@ public class WaypointScoringService {
             // Detour penalty (same formula as Google)
             score -= detourPenalty(p.getDetourMinutes());
 
-            score = Math.max(0, Math.min(100, score));
+            score = Math.min(100, score);
             result.add(ScoredWaypoint.fromOsm(p, score));
         }
         return result;

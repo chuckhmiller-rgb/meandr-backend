@@ -28,11 +28,12 @@ public class GooglePlacesTypeMapper {
             Map.entry("TRAILHEAD", List.of("park", "hiking_area")),
             Map.entry("CLIMBING_CRAG", List.of("tourist_attraction")),
             Map.entry("BIRD_HIDE", List.of("park")),
+            Map.entry("PARK", List.of("park", "national_park", "hiking_area")),
+            Map.entry("MONUMENT", List.of("monument", "historical_landmark", "national_park", "tourist_attraction")),
             // History / Culture
             Map.entry("RUINS", List.of("tourist_attraction", "historical_landmark")),
             Map.entry("COVERED_BRIDGE", List.of("tourist_attraction")),
-            Map.entry("BATTLEFIELD", List.of("historical_landmark", "tourist_attraction")),
-            Map.entry("MONUMENT", List.of("historical_landmark")),
+            Map.entry("BATTLEFIELD", List.of("historical_place", "historical_landmark", "tourist_attraction")),
             Map.entry("HISTORIC_SITE", List.of("historical_landmark", "tourist_attraction")),
             Map.entry("MUSEUM", List.of("museum")),
             Map.entry("ART_GALLERY", List.of("art_gallery")),
@@ -67,7 +68,29 @@ public class GooglePlacesTypeMapper {
             Map.entry("WAYSIDE_SHRINE", List.of("tourist_attraction")),
             Map.entry("RV_PARK", List.of("rv_park")),
             Map.entry("PICNIC_SITE", List.of("park")),
-            Map.entry("WILDERNESS_HUT", List.of("tourist_attraction"))
+            Map.entry("WILDERNESS_HUT", List.of("tourist_attraction")),
+            // Worship
+            Map.entry("church", List.of("church")),
+            Map.entry("CHURCH", List.of("church")),
+            Map.entry("synagogue", List.of("synagogue")),
+            Map.entry("SYNAGOGUE", List.of("synagogue")),
+            Map.entry("mosque", List.of("mosque")),
+            Map.entry("MOSQUE", List.of("mosque")),
+            Map.entry("hindu_temple", List.of("hindu_temple")),
+            Map.entry("HINDU_TEMPLE", List.of("hindu_temple")),
+            // Civic & Education
+            Map.entry("university", List.of("university")),
+            Map.entry("UNIVERSITY", List.of("university")),
+            Map.entry("courthouse", List.of("courthouse")),
+            Map.entry("COURTHOUSE", List.of("courthouse")),
+            Map.entry("city_hall", List.of("city_hall")),
+            Map.entry("CITY_HALL", List.of("city_hall")),
+            Map.entry("town_square", List.of("town_square")),
+            Map.entry("TOWN_SQUARE", List.of("town_square")),
+            Map.entry("stadium", List.of("stadium")),
+            Map.entry("STADIUM", List.of("stadium")),
+            Map.entry("sports_complex", List.of("sports_complex")),
+            Map.entry("SPORTS_COMPLEX", List.of("sports_complex"))
     );
 
     /**
@@ -79,6 +102,7 @@ public class GooglePlacesTypeMapper {
         return internalTypes.stream()
                 .filter(TYPE_MAP::containsKey)
                 .flatMap(t -> TYPE_MAP.get(t).stream())
+                .filter(s -> s != null && !s.isBlank())
                 .distinct()
                 .collect(Collectors.toList());
     }

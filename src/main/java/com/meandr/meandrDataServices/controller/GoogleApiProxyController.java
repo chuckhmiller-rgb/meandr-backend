@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,12 +42,14 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  *
  * @author chuck
  */
+@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @RestController
 @RequestMapping("/api/places")
 @Slf4j
@@ -60,7 +63,7 @@ public class GoogleApiProxyController {
             "dentist", "pharmacy", "lawyer", "real_estate_agency",
             "insurance_agency", "bank", "atm", "police", "funeral_home",
             "physiotherapist", "accounting", "storage", "moving_company",
-            "car_dealer", "car_repair", "car_wash", "laundry", "post_office"
+            "car_dealer", "car_repair", "car_wash", "laundry", "post_office", "restaurant"
     );
 
     private static final List<String> TYPE_PRIORITY = List.of(
@@ -68,8 +71,10 @@ public class GoogleApiProxyController {
             "amusement_park", "art_gallery",
             "restaurant", "fast_food_restaurant", "cafe", "bar", "bakery", "night_club",
             "museum", "historical_landmark",
-            "national_park", "hiking_area", "park", "tourist_attraction",
-            "lodging", "gas_station" 
+            "national_park", "hiking_area", "tourist_attraction",
+            "church", "synagogue", "mosque", "hindu_temple",
+            "university", "stadium", "courthouse", "city_hall",
+            "lodging", "gas_station", "park"
     );
 
     @Autowired
@@ -253,6 +258,8 @@ public class GoogleApiProxyController {
         headers.set("X-Goog-Api-Key", apiKey);
         // The FieldMask is REQUIRED. This defines what data you get back.
         headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount");
+        
+        requestBody.put("rankPreference", "POPULARITY");
 
         // 3. Prepare the Request Entity (Body + Headers)
         // Note: We pass the requestBody directly because it already contains your 
@@ -275,6 +282,31 @@ public class GoogleApiProxyController {
         }
     }
 
+    @GetMapping("/test-arch")
+    public ResponseEntity<?> testArch() {
+        String url = "https://places.googleapis.com/v1/places:searchNearby";
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("includedTypes", List.of("national_park", "park", "monument", "tourist_attraction"));
+        body.put("maxResultCount", 20);
+        body.put("locationRestriction", Map.of(
+                "circle", Map.of(
+                        "center", Map.of("latitude", 38.6247, "longitude", -90.1848),
+                        "radius", 5000.0
+                )
+        ));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Goog-Api-Key", apiKey); // whatever your @Value field is named
+        headers.set("X-Goog-FieldMask", "places.displayName,places.types,places.rating");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+        return ResponseEntity.ok(response.getBody());
+    }
+
     @Cacheable(
             value = "scenicSpots",
             key = "#root.target.cacheKey(#lat, #lng, #radius, #entityTypes)"
@@ -292,8 +324,8 @@ public class GoogleApiProxyController {
 
         // --- Tier 2: Google Places API ---
         List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(entityTypes);
-        if (googleTypes.isEmpty()) {
-            log.warn("No mappable Google Places types for: {}", entityTypes);
+        if (googleTypes == null || googleTypes.isEmpty()) {
+            log.warn("No valid Google types found for entity types: {}", entityTypes);
             return Collections.emptyList();
         }
 

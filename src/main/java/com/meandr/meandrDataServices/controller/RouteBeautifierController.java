@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/route")
@@ -60,7 +61,7 @@ public class RouteBeautifierController {
     public ResponseEntity<BeautifiedRouteResponseDto> beautifyRoute(
             @RequestBody BeautifyRequestDto request) throws Exception {
 
-        log.info("Request body: {}", new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request));
+        log.debug("Request body: {}", new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request));
         log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={}",
                 request.getOrigin().getLat(), request.getOrigin().getLng(),
                 request.getDestination().getLat(), request.getDestination().getLng(),

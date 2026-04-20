@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.server.ResponseStatusException;
 
+@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/users")

@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.lang.ArithmeticException;
 
+
+@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -24,17 +26,22 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         String login    = body.get("login");    // username or email
         String password = body.get("password");
+        String passwordHash = null;
+        
 
         try {
             // Try username first, then email
             Users user;
             try {
                 user = usersService.getApplicationUserByUsername(login);
+                passwordHash = user.getPasswordHash();
             } catch (RuntimeException e) {
                 user = usersService.getApplicationUserByEmail(login);
             }
+            
+            
 
-            if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            if (!passwordEncoder.matches(password, passwordHash)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Invalid credentials"));
             }

@@ -36,8 +36,51 @@ public class RouteBeautifierService {
     private final WaypointScoringService waypointScoringService;
     private final GeoApiContext context;
 
+    private static final double MIN_QUALITY_SCORE = 25;
+
     // FIX 2: Cap candidates per segment to prevent urban density monopoly
     private static final int MAX_CANDIDATES_PER_SEGMENT = 10;
+    private static final Map<String, Integer> MIN_REVIEWS = Map.ofEntries(
+            // Major institutions — high bar
+            Map.entry("university", 100),
+            Map.entry("stadium", 100),
+            Map.entry("aquarium", 100),
+            Map.entry("zoo", 100),
+            Map.entry("amusement_park", 100),
+            // Museums & culture — medium-high bar
+            Map.entry("museum", 50),
+            Map.entry("art_gallery", 25),
+            Map.entry("performing_arts_theater", 25),
+            Map.entry("historical_landmark", 25),
+            Map.entry("cultural_landmark", 25),
+            // Food & drink — low bar
+            Map.entry("restaurant", 15),
+            Map.entry("fast_food_restaurant", 15),
+            Map.entry("cafe", 10),
+            Map.entry("bar", 10),
+            Map.entry("bakery", 10),
+            // Parks & outdoors — very low bar (remote areas have few reviews)
+            Map.entry("national_park", 10),
+            Map.entry("park", 5),
+            Map.entry("campground", 5),
+            Map.entry("hiking_area", 5),
+            // Civic — medium bar
+            Map.entry("courthouse", 25),
+            Map.entry("city_hall", 25),
+            Map.entry("town_square", 25),
+            // Worship — higher bar due to member reviews
+            Map.entry("church", 50),
+            Map.entry("synagogue", 40),
+            Map.entry("mosque", 10),
+            Map.entry("hindu_temple", 10),
+            // Lodging & gas — low bar
+            Map.entry("lodging", 10),
+            Map.entry("gas_station", 5),
+            // Tourist attractions — medium bar
+            Map.entry("tourist_attraction", 35),
+            Map.entry("dog_park", 10),
+            Map.entry("botanical_garden", 25)
+    );
 
     @Value("${google.api.key}")
     private String googleMapsApiKey;
@@ -86,6 +129,7 @@ public class RouteBeautifierService {
 
         List<CoordinateDto> routeCoords;
         long baselineDurationMins;
+        int meandrFactorBase = 250;
         String encodedPolyline;
 
         if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
@@ -151,7 +195,7 @@ public class RouteBeautifierService {
             encodedPolyline = selectedRoute.overviewPolyline.getEncodedPath();
         }
 
-        double enhancementPct = (routeEnhancementThreshold / baselineDurationMins) * 100.0;
+        double enhancementPct = (routeEnhancementThreshold / meandrFactorBase) * 100.0;
         log.info("Enhancement: {} additional mins = {}% of base route",
                 routeEnhancementThreshold, String.format("%.1f", enhancementPct));
         log.info("Decoded route into {} coordinate points", routeCoords.size());
@@ -215,7 +259,10 @@ public class RouteBeautifierService {
         LatLng originPoint = path.get(0);
         LatLng destinationPoint = path.get(path.size() - 1);
 
-        int samplingStep = Math.max(1, path.size() / 50);
+        // Increase sample density — aim for one search every ~25km
+        int samplingStep = Math.max(1, (int) (path.size() / (totalPathLength / 25.0)));
+        log.info("Sampling: {} points, step={}, ~{} km between samples",
+                path.size(), samplingStep, String.format("%.1f", totalPathLength / (path.size() / (double) samplingStep)));
         int dynamicRadius = Math.min(10000, (int) (radius * (1 + (routeEnhancementThreshold / 1000.0))));
 
         List<ScenicSpot> candidates = findScenicSpotsAlongPath(
@@ -316,7 +363,7 @@ public class RouteBeautifierService {
             List<ScenicSpot> waypoints
     ) throws Exception {
 
-        // Enforce Google's 23 waypoint limit upfront, keeping highest-scoring
+        /* Enforce Google's 23 waypoint limit upfront, keeping highest-scoring
         List<ScenicSpot> workingWaypoints = waypoints.stream()
                 .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
                 .limit(23)
@@ -326,22 +373,21 @@ public class RouteBeautifierService {
         if (workingWaypoints.size() < waypoints.size()) {
             log.info("Capped waypoints from {} to 23 (Google limit), kept highest-scoring",
                     waypoints.size());
-        }
-
-        workingWaypoints.forEach(s -> log.info("Waypoint: {} placeId={}", s.getName(), s.getPlaceId()));
+        }*/
+        waypoints.forEach(s -> log.info("Waypoint: {} placeId={}", s.getName(), s.getPlaceId()));
 
         com.google.maps.model.LatLng googleOrigin
                 = new com.google.maps.model.LatLng(origin.lat, origin.lng);
         com.google.maps.model.LatLng googleDest
                 = new com.google.maps.model.LatLng(dest.lat, dest.lng);
 
-        while (!workingWaypoints.isEmpty()) {
+        while (!waypoints.isEmpty()) {
             DirectionsApiRequest request = DirectionsApi.newRequest(context)
                     .origin(googleOrigin)
                     .destination(googleDest)
                     .mode(TravelMode.DRIVING);
 
-            String[] waypointStrings = workingWaypoints.stream()
+            String[] waypointStrings = waypoints.stream()
                     .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
                     ? "place_id:" + s.getPlaceId()
                     : s.getLat() + "," + s.getLng())
@@ -351,22 +397,22 @@ public class RouteBeautifierService {
             try {
                 DirectionsResult result = request.await();
                 if (result.routes.length > 0) {
-                    log.info("Routing succeeded with {} waypoints", workingWaypoints.size());
+                    log.info("Routing succeeded with {} waypoints", waypoints.size());
                     return new RoutingResultWithWaypoints(
                             result.routes[0].overviewPolyline.getEncodedPath(),
-                            generateDebugUrl(origin, dest, workingWaypoints),
+                            generateDebugUrl(origin, dest, waypoints),
                             processSteps(result),
-                            workingWaypoints
+                            waypoints
                     );
                 }
             } catch (com.google.maps.errors.ZeroResultsException e) {
                 // Remove lowest-scoring waypoint and retry
-                ScenicSpot removed = workingWaypoints.stream()
+                ScenicSpot removed = waypoints.stream()
                         .min(Comparator.comparingDouble(ScenicSpot::getScore))
                         .get();
-                workingWaypoints.remove(removed);
+                waypoints.remove(removed);
                 log.warn("Google rejected route — removed lowest-scoring waypoint '{}' (score={}). {} remaining.",
-                        removed.getName(), String.format("%.1f", removed.getScore()), workingWaypoints.size());
+                        removed.getName(), String.format("%.1f", removed.getScore()), waypoints.size());
             }
         }
 
@@ -394,16 +440,6 @@ public class RouteBeautifierService {
         return new RoutingResultWithWaypoints("", "", new ArrayList<>(), new ArrayList<>());
     }
 
-    /**
-     * Get escalated selection with budget.
-     *
-     * @param allFoundSpots
-     * @param totalPathLength
-     * @param originalTripMins
-     * @param routeEnhancementThreshold
-     * @param dwellTimePerStop
-     * @return
-     */
     public List<ScenicSpot> getEscalatedSelection(
             List<ScenicSpot> allFoundSpots,
             double totalPathLength,
@@ -413,8 +449,18 @@ public class RouteBeautifierService {
     ) {
         double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
         int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
-        double budgetPerSegment = totalTimeBudget / numSegments;
         double segmentLength = totalPathLength / numSegments;
+
+        // Scale minimum segment budget with route length so long routes can afford city stops.
+        double avgStopCostMins = 5.0 + (totalPathLength / 3000.0) * 15.0;
+        double minSegmentBudget = avgStopCostMins + dwellTimePerStop;
+        double budgetPerSegment = Math.max(minSegmentBudget, totalTimeBudget / numSegments);
+
+        double[] segmentBudget = new double[numSegments];
+        double[] segmentSpent = new double[numSegments];
+        Arrays.fill(segmentBudget, budgetPerSegment);
+
+        List<ScenicSpot> finalSelection = new ArrayList<>();
 
         log.info("=== ESCALATED SELECTION START ===");
         log.info("Route: totalLength={} km, baseTrip={} mins, enhancement={}%, totalBudget={} mins",
@@ -424,12 +470,124 @@ public class RouteBeautifierService {
                 numSegments, String.format("%.1f", segmentLength), String.format("%.1f", budgetPerSegment));
         log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
 
-        // Group candidates by segment
+// =============================================================
+// PASS 0: Landmark anchors, clustering, and empty segment fill
+// =============================================================
+        final int MAX_CLUSTER_COMPANIONS = 2;
+        List<ScenicSpot> pass0Selections = new ArrayList<>();
+        Set<String> landmarkPlaceIds = new HashSet<>();
+
+// --- Pass 0a: Best by popularity per segment (min 4.5 rating, 1000 reviews) ---
+        log.info("--- PASS 0a: Landmark anchors ---");
+        for (int i = 0; i < numSegments; i++) {
+            final int seg = i;
+            Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
+                    .filter(wp -> wp.getRating() >= 4.5)
+                    .filter(wp -> wp.getUserRatingsTotal() >= 1000)
+                    .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
+                    .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
+
+            if (bestOpt.isPresent()) {
+                ScenicSpot best = bestOpt.get();
+                best.setSegmentIndex(seg);
+                pass0Selections.add(best);
+                landmarkPlaceIds.add(best.getPlaceId());
+                log.info("  Landmark seg={}: {} (rating={}, reviews={})",
+                        seg, best.getName(), best.getRating(), best.getUserRatingsTotal());
+            }
+        }
+
+// --- Pass 0b: Cluster companions for each landmark ---
+        log.info("--- PASS 0b: Cluster companions ---");
+        List<ScenicSpot> pass0aSnapshot = new ArrayList<>(pass0Selections);
+        for (ScenicSpot landmark : pass0aSnapshot) {
+            allFoundSpots.stream()
+                    .filter(wp -> wp.getRating() >= 4.3)
+                    .filter(wp -> wp.getUserRatingsTotal() >= 500)
+                    .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
+                    .filter(wp -> haversineKm(landmark.getLat(), landmark.getLng(),
+                    wp.getLat(), wp.getLng()) <= 10.0)
+                    .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
+                    .limit(MAX_CLUSTER_COMPANIONS)
+                    .forEach(companion -> {
+                        companion.setSegmentIndex(landmark.getSegmentIndex());
+                        pass0Selections.add(companion);
+                        landmarkPlaceIds.add(companion.getPlaceId());
+                        log.info("  Companion for {}: {} (rating={}, reviews={})",
+                                landmark.getName(), companion.getName(),
+                                companion.getRating(), companion.getUserRatingsTotal());
+                    });
+        }
+
+// --- Pass 0d: Fill empty segments with best available anchor ---
+        log.info("--- PASS 0d: Empty segment fill ---");
+        for (int i = 0; i < numSegments; i++) {
+            final int seg = i;
+            boolean segmentHasSelection = pass0Selections.stream()
+                    .anyMatch(wp -> wp.getSegmentIndex() == seg);
+
+            if (!segmentHasSelection) {
+                Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
+                        .filter(wp -> wp.getRating() >= 4.5)
+                        .filter(wp -> wp.getUserRatingsTotal() >= 100)
+                        .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
+                        .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength),
+                        numSegments - 1) == seg)
+                        .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
+
+                if (bestOpt.isPresent()) {
+                    ScenicSpot best = bestOpt.get();
+                    best.setSegmentIndex(seg);
+                    pass0Selections.add(best);
+                    landmarkPlaceIds.add(best.getPlaceId());
+                    log.info("  Filled seg={}: {} (rating={}, reviews={})",
+                            seg, best.getName(), best.getRating(), best.getUserRatingsTotal());
+
+                    // Cluster companions for this anchor too
+                    allFoundSpots.stream()
+                            .filter(wp -> wp.getRating() >= 4.3)
+                            .filter(wp -> wp.getUserRatingsTotal() >= 500)
+                            .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
+                            .filter(wp -> haversineKm(best.getLat(), best.getLng(),
+                            wp.getLat(), wp.getLng()) <= 10.0)
+                            .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
+                            .limit(MAX_CLUSTER_COMPANIONS)
+                            .forEach(companion -> {
+                                companion.setSegmentIndex(seg);
+                                pass0Selections.add(companion);
+                                landmarkPlaceIds.add(companion.getPlaceId());
+                                log.info("    Companion: {} (rating={}, reviews={})",
+                                        companion.getName(), companion.getRating(),
+                                        companion.getUserRatingsTotal());
+                            });
+                } else {
+                    log.info("  seg={}: no qualifying anchor found", seg);
+                }
+            }
+        }
+
+// --- Remove all Pass 0 selections from candidate pool ---
+        allFoundSpots = allFoundSpots.stream()
+                .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
+                .collect(Collectors.toList());
+
+// --- Deduct Pass 0 budget and add to final selection ---
+        double pass0BudgetUsed = pass0Selections.stream()
+                .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
+                .sum();
+        totalTimeBudget -= pass0BudgetUsed;
+        finalSelection.addAll(pass0Selections);
+
+        log.info("--- PASS 0 COMPLETE: {} spots selected, {:.1f} mins used, {:.1f} mins remaining ---",
+                pass0Selections.size(),
+                pass0BudgetUsed,
+                totalTimeBudget);
+
+        // Group candidates by segment, sorted by score descending
         Map<Integer, List<ScenicSpot>> bySegment = new HashMap<>();
         for (int i = 0; i < numSegments; i++) {
             bySegment.put(i, new ArrayList<>());
         }
-
         for (ScenicSpot spot : allFoundSpots) {
             int seg = Math.min((int) (spot.getDistFromStart() / segmentLength), numSegments - 1);
             spot.setSegmentIndex(seg);
@@ -437,18 +595,16 @@ public class RouteBeautifierService {
             bySegment.get(seg).sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
         }
 
-        // FIX 2: Cap candidates per segment to prevent dense urban segments monopolizing selection
+        // Cap candidates per segment to prevent dense urban segments monopolizing selection
         for (int i = 0; i < numSegments; i++) {
             List<ScenicSpot> segCandidates = bySegment.get(i);
             if (segCandidates.size() > MAX_CANDIDATES_PER_SEGMENT) {
-                // Already sorted by score descending above — just trim
                 bySegment.put(i, new ArrayList<>(segCandidates.subList(0, MAX_CANDIDATES_PER_SEGMENT)));
                 log.info("  Segment {}: trimmed from {} to {} candidates (density cap)",
                         i, segCandidates.size(), MAX_CANDIDATES_PER_SEGMENT);
             }
         }
 
-        // Log candidate distribution
         for (int i = 0; i < numSegments; i++) {
             log.info("  Segment {}: [{} km - {} km] — {} candidates",
                     i,
@@ -457,37 +613,45 @@ public class RouteBeautifierService {
                     bySegment.get(i).size());
         }
 
-        double[] segmentBudget = new double[numSegments];
-        double[] segmentSpent = new double[numSegments];
-        Arrays.fill(segmentBudget, budgetPerSegment);
-
-        List<ScenicSpot> finalSelection = new ArrayList<>();
+        // Pre-populate segmentSpent with Pass 0 costs before Pass 1
+        for (ScenicSpot spot : pass0Selections) {
+            int seg = spot.getSegmentIndex();
+            if (seg >= 0 && seg < numSegments) {
+                segmentSpent[seg] += spot.getDetour() + dwellTimePerStop;
+            }
+        }
 
         // --- Pass 1: Initial per-segment selection ---
         log.info("--- PASS 1: Initial per-segment selection ---");
         for (int seg = 0; seg < numSegments; seg++) {
+            double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+            if (globalSpent >= totalTimeBudget) {
+                break;
+            }
+
+            double effectiveBudget = Math.min(segmentBudget[seg], totalTimeBudget - globalSpent);
             final int currentSeg = seg;
+
             segmentSpent[seg] = runSegmentSelection(
-                    seg, bySegment.get(seg), segmentBudget[seg],
+                    seg, bySegment.get(seg), effectiveBudget,
                     finalSelection, dwellTimePerStop, segmentSpent[seg], totalPathLength);
-            double consumed = segmentSpent[seg];
-            double unspent = segmentBudget[seg] - segmentSpent[seg];
+
             log.info("  Segment {}: consumed={} mins, unspent={} mins, waypoints selected={}",
                     seg,
-                    String.format("%.1f", consumed),
-                    String.format("%.1f", unspent),
+                    String.format("%.1f", segmentSpent[seg]),
+                    String.format("%.1f", segmentBudget[seg] - segmentSpent[seg]),
                     finalSelection.stream().filter(s -> s.getSegmentIndex() == currentSeg).count());
         }
 
         long pass1Count = finalSelection.size();
-        double pass1Spent = Arrays.stream(segmentSpent).sum();
+        double pass1Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
         log.info("Pass 1 complete: {} waypoints selected, {}/{} mins budget used ({}%)",
                 pass1Count,
                 String.format("%.1f", pass1Spent),
                 String.format("%.1f", totalTimeBudget),
                 Math.round((pass1Spent / totalTimeBudget) * 100));
 
-        // --- Pass 2: Budget diffusion (BFS outward from unspent segments) ---
+        // --- Pass 2: Budget diffusion ---
         log.info("--- PASS 2: Budget diffusion ---");
         boolean anyDiffused = true;
         int diffusionRound = 0;
@@ -504,7 +668,6 @@ public class RouteBeautifierService {
 
             log.info("  Diffusion round {}:", diffusionRound);
 
-            // Empty segments first, partial segments after
             List<Integer> diffusionSources = new ArrayList<>();
             for (int seg = 0; seg < numSegments; seg++) {
                 if (exhaustedSources.contains(seg)) {
@@ -516,12 +679,10 @@ public class RouteBeautifierService {
                 }
                 if (segmentSpent[seg] == 0) {
                     diffusionSources.add(0, seg);
-                    log.info("    Queued segment {} as EMPTY source ({} mins unspent)",
-                            seg, String.format("%.1f", unspent));
+                    log.info("    Queued segment {} as EMPTY source ({} mins unspent)", seg, String.format("%.1f", unspent));
                 } else {
                     diffusionSources.add(seg);
-                    log.info("    Queued segment {} as PARTIAL source ({} mins unspent)",
-                            seg, String.format("%.1f", unspent));
+                    log.info("    Queued segment {} as PARTIAL source ({} mins unspent)", seg, String.format("%.1f", unspent));
                 }
             }
 
@@ -536,54 +697,50 @@ public class RouteBeautifierService {
                     continue;
                 }
 
-                log.info("    Diffusing from segment {} ({} mins unspent):",
-                        source, String.format("%.1f", unspent));
+                log.info("    Diffusing from segment {} ({} mins unspent):", source, String.format("%.1f", unspent));
 
                 int maxRadius = numSegments - 1;
                 boolean sourceDiffused = false;
 
                 for (int radius = 1; radius <= maxRadius; radius++) {
                     double consumedAtRadius = 0;
-                    int[] neighbors = {source - radius, source + radius};
 
-                    for (int neighbor : neighbors) {
+                    for (int neighbor : new int[]{source - radius, source + radius}) {
                         if (neighbor < 0 || neighbor >= numSegments) {
                             continue;
                         }
                         final int currentNeighbor = neighbor;
 
-                        // Offer the FULL unspent amount — neighbor takes only what it can spend
+                        double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+                        if (globalSpent >= totalTimeBudget) {
+                            break;
+                        }
+
                         double allocating = unspent;
                         segmentBudget[neighbor] += allocating;
+                        double effectiveBudget = Math.min(segmentBudget[neighbor], totalTimeBudget - globalSpent);
 
                         log.info("        Segment {}: allocating {} mins (budget now {})",
-                                neighbor,
-                                String.format("%.1f", allocating),
-                                String.format("%.1f", segmentBudget[neighbor]));
+                                neighbor, String.format("%.1f", allocating), String.format("%.1f", segmentBudget[neighbor]));
 
                         double before = segmentSpent[neighbor];
                         segmentSpent[neighbor] = runSegmentSelection(
-                                neighbor, bySegment.get(neighbor), segmentBudget[neighbor],
+                                neighbor, bySegment.get(neighbor), effectiveBudget,
                                 finalSelection, dwellTimePerStop, segmentSpent[neighbor], totalPathLength);
+
                         double consumed = segmentSpent[neighbor] - before;
                         consumedAtRadius += consumed;
 
                         if (consumed > 0) {
                             double unclaimed = allocating - consumed;
-                            // FIX 3: Reclaim unused allocation so it doesn't inflate the budget
                             segmentBudget[neighbor] -= unclaimed;
                             unspent -= consumed;
                             anyDiffused = true;
                             sourceDiffused = true;
                             log.info("        Segment {}: consumed {} mins, reclaimed {} mins — now has {} waypoints",
-                                    neighbor,
-                                    String.format("%.1f", consumed),
-                                    String.format("%.1f", unclaimed),
-                                    finalSelection.stream()
-                                            .filter(s -> s.getSegmentIndex() == currentNeighbor)
-                                            .count());
+                                    neighbor, String.format("%.1f", consumed), String.format("%.1f", unclaimed),
+                                    finalSelection.stream().filter(s -> s.getSegmentIndex() == currentNeighbor).count());
                         } else {
-                            // Nothing consumed — reclaim allocation, leave segmentSpent untouched
                             segmentBudget[neighbor] -= allocating;
                             log.info("        Segment {}: consumed nothing — budget fully reclaimed", neighbor);
                         }
@@ -592,9 +749,7 @@ public class RouteBeautifierService {
                     if (consumedAtRadius == 0) {
                         log.info("      Radius {} yielded nothing — expanding to radius {}", radius, radius + 1);
                     } else {
-                        // FIX 3: Only credit the source segment for what was actually consumed
-                        segmentSpent[source] = Math.min(segmentBudget[source],
-                                segmentSpent[source] + consumedAtRadius);
+                        segmentSpent[source] = Math.min(segmentBudget[source], segmentSpent[source] + consumedAtRadius);
                         log.info("      Radius {} consumed {} mins — stopping diffusion from segment {}",
                                 radius, String.format("%.1f", consumedAtRadius), source);
                         break;
@@ -602,16 +757,13 @@ public class RouteBeautifierService {
                 }
 
                 if (!sourceDiffused) {
-                    // No neighbor can absorb budget — mark truly exhausted without faking segmentSpent
                     exhaustedSources.add(source);
                     log.info("    Segment {}: no neighbors absorbed budget at any radius — marked as exhausted", source);
                 }
             }
         }
 
-        double finalSpent = finalSelection.stream()
-                .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
-                .sum();
+        double finalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
         log.info("=== ESCALATED SELECTION COMPLETE ===");
         log.info("Waypoints: {} selected | Actual time cost: {}/{} mins ({}%) | Diffusion added: {}",
                 finalSelection.size(),
@@ -642,6 +794,7 @@ public class RouteBeautifierService {
             double alreadySpent,
             double totalPathLengthKm
     ) {
+
         double spent = alreadySpent;
 
         log.info("    runSegmentSelection seg={} budget={} alreadySpent={} candidates={}",
@@ -656,6 +809,14 @@ public class RouteBeautifierService {
             }
             if (finalSelection.size() >= 23) {
                 break;
+            }
+
+            double qualityScore = Math.max(0, (spot.getRating() - 2.5) / 2.5 * 60.0)
+                    + Math.min(30.0, Math.log10(spot.getUserRatingsTotal() + 1) / Math.log10(100000) * 30.0);
+            if (qualityScore < MIN_QUALITY_SCORE) {
+                log.info("      ~ skipped (low quality): {} (quality={})",
+                        spot.getName(), String.format("%.1f", qualityScore));
+                break; // candidates sorted desc by score — all remaining also low quality
             }
 
             double cost = spot.getDetour() + dwellTimePerStop;
@@ -736,6 +897,12 @@ public class RouteBeautifierService {
                 for (ScenicSpot spot : nearby) {
                     if (spot.getRating() == 0 && spot.getUserRatingsTotal() == 0) {
                         log.debug("Filtered zero-rating result: {}", spot.getName());
+                        continue;
+                    }
+                    int minReviews = MIN_REVIEWS.getOrDefault(spot.getEntityType(), 5);
+                    if (spot.getUserRatingsTotal() < minReviews) {
+                        log.debug("Filtered low-review result: {} ({} reviews, min={})",
+                                spot.getName(), spot.getUserRatingsTotal(), minReviews);
                         continue;
                     }
                     if (seenPlaceIds.contains(spot.getPlaceId())) {
@@ -924,10 +1091,6 @@ public class RouteBeautifierService {
         return candidates;
     }
 
-    /**
-     * Calculate score for a scenic spot. FIX 1: arrivalBonus was inverted — now
-     * correctly rewards spots closer to destination.
-     */
     private double calculateScore(
             ScenicSpot spot,
             LatLng roadPoint,
@@ -936,25 +1099,25 @@ public class RouteBeautifierService {
             LatLng dest
     ) {
         double detourDistanceKm = haversine(roadPoint.lat, roadPoint.lng, spot.getLat(), spot.getLng());
-        // FIX 5: Use highway speed (80 km/h) for detour estimation, not 30 km/h city speed.
-        // A spot 10km from the road point on a highway-adjacent route costs ~15 mins round-trip,
-        // not 40 mins. The old formula was making desert/highway stops appear far too expensive.
         int estimatedDetourMins = (int) ((detourDistanceKm * 2.0 / 80.0) * 60.0);
         spot.setDetour(estimatedDetourMins);
 
-        double detourPenalty = 0;
-        if (estimatedDetourMins > routeEnhancementThreshold) {
-            detourPenalty = (estimatedDetourMins - routeEnhancementThreshold) * 5.0;
-        }
-
+        // Rating component: 0-60 pts. A 5★ place scores 60, a 2.5★ scores 0.
         double baseRating = spot.getRating() > 0 ? spot.getRating() : 2.5;
-        double logReviews = Math.log10(spot.getUserRatingsTotal() + 1);
+        double ratingScore = Math.max(0, (baseRating - 2.5) / 2.5 * 60.0);
 
+        // Popularity component: 0-30 pts. log scale — 10 reviews ≈ 10pts, 1000 ≈ 20pts, 100k ≈ 30pts.
+        double popularityScore = Math.min(30.0, Math.log10(spot.getUserRatingsTotal() + 1) / Math.log10(100000) * 30.0);
+
+        // Arrival bonus: 0-5 pts. Slightly favors stops further along the route.
         double distToDest = haversine(spot.getLat(), spot.getLng(), dest.lat, dest.lng);
-        // FIX 1: Higher bonus for spots closer to destination (further along the route).
-        double arrivalBonus = (1.0 - (distToDest / totalDist)) * 2.0;
+        double arrivalBonus = (1.0 - (distToDest / totalDist)) * 5.0;
 
-        return (baseRating * 3) + logReviews + arrivalBonus - detourPenalty;
+        // Detour penalty: mild, 0.2 pts per minute. A 15-min detour costs 3 pts.
+        double detourPenalty = estimatedDetourMins * 0.2;
+
+        double score = ratingScore + popularityScore + arrivalBonus - detourPenalty;
+        return Math.max(0, score);
     }
 
     /**
@@ -963,7 +1126,7 @@ public class RouteBeautifierService {
      * evenly (e.g. ~12km for a 600km route).
      */
     private boolean isSpaceAvailable(List<ScenicSpot> existing, ScenicSpot candidate, double totalPathLengthKm) {
-        double minDistKm = Math.max(1.5, totalPathLengthKm / 50.0);
+        double minDistKm = Math.min(30.0, Math.max(1.5, totalPathLengthKm / 50.0));  // ← cap at 30km
         for (ScenicSpot s : existing) {
             double dist = haversine(s.getLat(), s.getLng(), candidate.getLat(), candidate.getLng());
             if (dist < minDistKm) {
@@ -999,6 +1162,16 @@ public class RouteBeautifierService {
                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
+    }
+
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     /**

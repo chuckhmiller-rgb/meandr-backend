@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @RestController
 @RequestMapping("/api/v1/routes")
 @RequiredArgsConstructor
