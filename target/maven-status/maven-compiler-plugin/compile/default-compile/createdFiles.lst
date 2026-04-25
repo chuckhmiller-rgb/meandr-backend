@@ -26,6 +26,7 @@ com/meandr/meandrDataServices/dto/UserRouteDto$UserRouteDtoBuilder.class
 com/meandr/meandrDataServices/osm/service/OsmService.class
 com/meandr/meandrDataServices/model/ClimbingGym.class
 com/meandr/meandrDataServices/repository/ClimbingGymRepository.class
+com/meandr/meandrDataServices/dto/RerouteRequestDto.class
 com/meandr/meandrDataServices/scoring/ScoredWaypoint.class
 com/meandr/meandrDataServices/scoring/WaypointScoringService.class
 com/meandr/meandrDataServices/repository/ParkRepository.class
@@ -47,6 +48,7 @@ com/meandr/meandrDataServices/dto/TripSummary.class
 com/meandr/meandrDataServices/service/ScenicRankerService.class
 com/meandr/meandrDataServices/controller/ParkController.class
 com/meandr/meandrDataServices/dto/UserRouteDto$RouteStopDto$RouteStopDtoBuilder.class
+com/meandr/meandrDataServices/dto/RerouteRequestDto$WaypointDto.class
 com/meandr/meandrDataServices/preferences/PreferenceTier.class
 com/meandr/meandrDataServices/service/UserRouteService.class
 com/meandr/meandrDataServices/dto/UsersRegistrationDto.class

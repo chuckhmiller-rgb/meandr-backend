@@ -1,6 +1,7 @@
 package com.meandr.meandrDataServices.service;
 
 import com.meandr.meandrDataServices.model.ScenicSpot;
+import java.util.Collections;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,8 +47,12 @@ public class PlacesCacheService {
         double minLng = lng - lngDelta;
         double maxLng = lng + lngDelta;
 
+        if (entityTypes == null || entityTypes.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         String placeholders = String.join(",",
-                entityTypes.stream().map(t -> "?").toArray(String[]::new));
+                entityTypes.stream().map(t -> "?").toArray(String[]::new)); 
 
         String sql = String.format("""
                 SELECT place_id, name, lat, lng, rating, user_ratings_total,
@@ -80,7 +85,9 @@ public class PlacesCacheService {
 
         int saved = 0;
         for (ScenicSpot spot : spots) {
-            if (spot.getPlaceId() == null || spot.getPlaceId().isBlank()) continue;
+            if (spot.getPlaceId() == null || spot.getPlaceId().isBlank()) {
+                continue;
+            }
             jdbcTemplate.update(sql,
                     spot.getPlaceId(),
                     spot.getName(),

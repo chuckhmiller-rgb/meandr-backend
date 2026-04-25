@@ -22,6 +22,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/CoordinateDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/ParkResponseDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/PlaceSearchRequestDto.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/RerouteRequestDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/RouteStepDetailDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/RouteStepSummaryDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/TripSummary.java

@@ -16,6 +16,8 @@ public class BeautifyRequestDto {
     private int dwellTimePerStop = 5;
     private boolean avoidHighways = false;
     private boolean avoidTolls = false;
+    private boolean excludeOrigin = false;
+    private boolean excludeDest = false;
 
     public List<List<Double>> getSelectedRouteCoords() {
         return selectedRouteCoords;
@@ -87,5 +89,21 @@ public class BeautifyRequestDto {
 
     public void setAvoidTollsHighways(boolean avoidTolls) {
         this.avoidTolls = avoidTolls;
+    }
+
+    public boolean isExcludeOrigin() {
+        return excludeOrigin;
+    }
+
+    public void setExcludeOrigin(boolean excludeOrigin) {
+        this.excludeOrigin = excludeOrigin;
+    }
+
+    public boolean isExcludeDest() {
+        return excludeDest;
+    }
+
+    public void setExcludeDest(boolean excludeDest) {
+        this.excludeDest = excludeDest;
     }
 }

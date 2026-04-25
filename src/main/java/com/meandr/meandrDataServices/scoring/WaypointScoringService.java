@@ -119,7 +119,7 @@ public class WaypointScoringService {
             double score    = Math.min(100, quality + prefBonus - penalty);
             
             
-            log.info("Google place: " + c.getName() + " overall meandr score: " + score + " quality = " + quality + " prefBonus = " + prefBonus + " penalty = " + penalty);
+            log.debug("Google place: " + c.getName() + " overall meandr score: " + score + " quality = " + quality + " prefBonus = " + prefBonus + " penalty = " + penalty);
 
             result.add(ScoredWaypoint.fromGoogle(c, score));
         }

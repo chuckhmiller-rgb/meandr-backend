@@ -3,7 +3,11 @@ package com.meandr.meandrDataServices.service;
 import com.google.maps.DirectionsApi;
 import com.google.maps.DirectionsApiRequest;
 import com.google.maps.GeoApiContext;
+import com.google.maps.internal.PolylineEncoding;
+import com.google.maps.model.DirectionsLeg;
 import com.google.maps.model.DirectionsResult;
+import com.google.maps.model.DirectionsRoute;
+import com.google.maps.model.DirectionsStep;
 import com.google.maps.model.TravelMode;
 import com.meandr.meandrDataServices.controller.GoogleApiProxyController;
 import com.meandr.meandrDataServices.dto.*;
@@ -26,459 +30,579 @@ import com.meandr.meandrDataServices.scoring.WaypointScoringService;
 import com.meandr.meandrDataServices.scoring.ScoredWaypoint;
 import com.meandr.meandrDataServices.scoring.GooglePlaceCandidate;
 
-@Slf4j
+
+
+@Slf4j 
 @Service
 @RequiredArgsConstructor
 public class RouteBeautifierService {
 
-    private final GoogleApiProxyController googleProxy;
-    private final OsmService osmService;
-    private final WaypointScoringService waypointScoringService;
-    private final GeoApiContext context;
+        private final GoogleApiProxyController googleProxy;
+        private final OsmService osmService;
+        private final WaypointScoringService waypointScoringService;
+        private final GeoApiContext context;
 
-    private static final double MIN_QUALITY_SCORE = 25;
+        private static final double MIN_QUALITY_SCORE = 25;
 
-    // FIX 2: Cap candidates per segment to prevent urban density monopoly
-    private static final int MAX_CANDIDATES_PER_SEGMENT = 10;
-    private static final Map<String, Integer> MIN_REVIEWS = Map.ofEntries(
-            // Major institutions — high bar
-            Map.entry("university", 100),
-            Map.entry("stadium", 100),
-            Map.entry("aquarium", 100),
-            Map.entry("zoo", 100),
-            Map.entry("amusement_park", 100),
-            // Museums & culture — medium-high bar
-            Map.entry("museum", 50),
-            Map.entry("art_gallery", 25),
-            Map.entry("performing_arts_theater", 25),
-            Map.entry("historical_landmark", 25),
-            Map.entry("cultural_landmark", 25),
-            // Food & drink — low bar
-            Map.entry("restaurant", 15),
-            Map.entry("fast_food_restaurant", 15),
-            Map.entry("cafe", 10),
-            Map.entry("bar", 10),
-            Map.entry("bakery", 10),
-            // Parks & outdoors — very low bar (remote areas have few reviews)
-            Map.entry("national_park", 10),
-            Map.entry("park", 5),
-            Map.entry("campground", 5),
-            Map.entry("hiking_area", 5),
-            // Civic — medium bar
-            Map.entry("courthouse", 25),
-            Map.entry("city_hall", 25),
-            Map.entry("town_square", 25),
-            // Worship — higher bar due to member reviews
-            Map.entry("church", 50),
-            Map.entry("synagogue", 40),
-            Map.entry("mosque", 10),
-            Map.entry("hindu_temple", 10),
-            // Lodging & gas — low bar
-            Map.entry("lodging", 10),
-            Map.entry("gas_station", 5),
-            // Tourist attractions — medium bar
-            Map.entry("tourist_attraction", 35),
-            Map.entry("dog_park", 10),
-            Map.entry("botanical_garden", 25)
-    );
+        // FIX 2: Cap candidates per segment to prevent urban density monopoly
+        private static final int MAX_CANDIDATES_PER_SEGMENT = 10;
+        private static final Map<String, Integer> MIN_REVIEWS = Map.ofEntries(
+                // Major institutions — high bar
+                Map.entry("university", 100),
+                Map.entry("stadium", 100),
+                Map.entry("aquarium", 100),
+                Map.entry("zoo", 100),
+                Map.entry("amusement_park", 100),
+                // Museums & culture — medium-high bar
+                Map.entry("museum", 50),
+                Map.entry("art_gallery", 25),
+                Map.entry("performing_arts_theater", 25),
+                Map.entry("historical_landmark", 25),
+                Map.entry("cultural_landmark", 25),
+                // Food & drink — low bar
+                Map.entry("restaurant", 15),
+                Map.entry("fast_food_restaurant", 15),
+                Map.entry("cafe", 10),
+                Map.entry("bar", 10),
+                Map.entry("bakery", 10),
+                // Parks & outdoors — very low bar (remote areas have few reviews)
+                Map.entry("national_park", 10),
+                Map.entry("park", 5),
+                Map.entry("campground", 5),
+                Map.entry("hiking_area", 5),
+                // Civic — medium bar
+                Map.entry("courthouse", 25),
+                Map.entry("city_hall", 25),
+                Map.entry("town_square", 25),
+                // Worship — higher bar due to member reviews
+                Map.entry("church", 50),
+                Map.entry("synagogue", 40),
+                Map.entry("mosque", 10),
+                Map.entry("hindu_temple", 10),
+                // Lodging & gas — low bar
+                Map.entry("lodging", 10),
+                Map.entry("gas_station", 5),
+                // Tourist attractions — medium bar
+                Map.entry("tourist_attraction", 35),
+                Map.entry("dog_park", 10),
+                Map.entry("botanical_garden", 25)
+        );
 
-    @Value("${google.api.key}")
-    private String googleMapsApiKey;
+        LatLng originPoint;
+        LatLng destinationPoint;
 
-    /**
-     * Inner class to hold both routing result and the waypoints that were
-     * actually used.
-     */
-    @Data
-    @AllArgsConstructor
-    public static class RoutingResultWithWaypoints {
+        @Value("${google.api.key}")
+        private String googleMapsApiKey;
 
-        private String polyline;
-        private String debugUrl;
-        private List<RouteStepSummaryDto> steps;
-        private List<ScenicSpot> actualWaypoints;
-    }
+        /**
+         * Inner class to hold both routing result and the waypoints that were
+         * actually used.
+         */
+        @Data
+        @AllArgsConstructor
+        public static class RoutingResultWithWaypoints {
 
-    /**
-     * Decode Google polyline into list of coordinates.
-     */
-    private List<CoordinateDto> decodePolylineToCoordinates(String encodedPolyline) {
-        List<com.google.maps.model.LatLng> decoded
-                = com.google.maps.internal.PolylineEncoding.decode(encodedPolyline);
+            private String polyline;
+            private String debugUrl;
+            private List<RouteStepSummaryDto> steps;
+            private List<ScenicSpot> actualWaypoints;
+        }
 
-        return decoded.stream()
-                .map(point -> new CoordinateDto(point.lat, point.lng))
-                .collect(Collectors.toList());
-    }
+        /**
+         * Decode Google polyline into list of coordinates.
+         */
+        private List<CoordinateDto> decodePolylineToCoordinates(String encodedPolyline) {
+            List<com.google.maps.model.LatLng> decoded
+                    = com.google.maps.internal.PolylineEncoding.decode(encodedPolyline);
 
-    public BeautifiedRouteResponseDto beautifyRouteWithScenicRoads(
-            CoordinateDto origin,
-            CoordinateDto dest,
-            double routeEnhancementThreshold,
-            int radius,
-            List<String> entityPreferences,
-            boolean avoidHighways,
-            boolean avoidTolls,
-            int dwellTimePerStop,
-            List<List<Double>> selectedRouteCoords
-    ) throws Exception {
-
-        log.info("Beautifying route: maxAdditionalMinutes={}, avoidHighways={}, avoidTolls={}, hasSelectedCoords={}",
-                routeEnhancementThreshold, avoidHighways, avoidTolls,
-                selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
-
-        List<CoordinateDto> routeCoords;
-        long baselineDurationMins;
-        int meandrFactorBase = 250;
-        String encodedPolyline;
-
-        if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
-            // Use pre-selected route coordinates from frontend
-            routeCoords = selectedRouteCoords.stream()
-                    .map(c -> new CoordinateDto(c.get(1), c.get(0))) // GeoJSON is [lng, lat]
+            return decoded.stream()
+                    .map(point -> new CoordinateDto(point.lat, point.lng))
                     .collect(Collectors.toList());
-            baselineDurationMins = estimateDuration(routeCoords);
-            encodedPolyline = encodePolyline(routeCoords);
-            log.info("Using pre-selected route: {} coords, estimated {} mins", routeCoords.size(), baselineDurationMins);
-        } else {
-            // Fetch routes from Directions API
-            com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
-            com.google.maps.model.LatLng googleDest = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
-
-            // Always fetch fastest route for reference
-            DirectionsResult fastestResult = DirectionsApi.newRequest(context)
-                    .origin(googleOrigin).destination(googleDest)
-                    .alternatives(false).mode(TravelMode.DRIVING).await();
-
-            if (fastestResult.routes == null || fastestResult.routes.length == 0) {
-                throw new RuntimeException("No baseline route found between origin and destination");
-            }
-
-            long fastestRouteMins = fastestResult.routes[0].legs[0].duration.inSeconds / 60;
-            log.info("Fastest route duration: {} mins", fastestRouteMins);
-
-            // Fetch base route with restrictions
-            DirectionsApiRequest baseRequest = DirectionsApi.newRequest(context)
-                    .origin(googleOrigin).destination(googleDest)
-                    .alternatives(true).mode(TravelMode.DRIVING);
-
-            List<DirectionsApi.RouteRestriction> restrictions = new ArrayList<>();
-            if (avoidHighways) {
-                restrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
-            }
-            if (avoidTolls) {
-                restrictions.add(DirectionsApi.RouteRestriction.TOLLS);
-            }
-            if (!restrictions.isEmpty()) {
-                baseRequest.avoid(restrictions.toArray(new DirectionsApi.RouteRestriction[0]));
-            }
-
-            DirectionsResult baseResult = baseRequest.await();
-            if (baseResult.routes == null || baseResult.routes.length == 0) {
-                throw new RuntimeException("No routes found for beautification");
-            }
-
-            baselineDurationMins = baseResult.routes[0].legs[0].duration.inSeconds / 60;
-            log.info("Base route duration: {} mins (fastest was {} mins)", baselineDurationMins, fastestRouteMins);
-
-            double enhancementPct = (routeEnhancementThreshold / baselineDurationMins) * 100.0;
-            double maxAcceptableMins = baselineDurationMins * (1 + enhancementPct / 100.0);
-
-            com.google.maps.model.DirectionsRoute selectedRoute = Arrays.stream(baseResult.routes)
-                    .filter(r -> (r.legs[0].duration.inSeconds / 60.0) <= maxAcceptableMins)
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException(String.format(
-                    "No routes available within your enhancement budget of %.0f mins.", maxAcceptableMins)));
-
-            log.info("Selected route: {} mins", selectedRoute.legs[0].duration.inSeconds / 60);
-            routeCoords = decodePolylineToCoordinates(selectedRoute.overviewPolyline.getEncodedPath());
-            encodedPolyline = selectedRoute.overviewPolyline.getEncodedPath();
         }
 
-        double enhancementPct = (routeEnhancementThreshold / meandrFactorBase) * 100.0;
-        log.info("Enhancement: {} additional mins = {}% of base route",
-                routeEnhancementThreshold, String.format("%.1f", enhancementPct));
-        log.info("Decoded route into {} coordinate points", routeCoords.size());
+        public BeautifiedRouteResponseDto beautifyRouteWithScenicRoads(
+                CoordinateDto origin,
+                CoordinateDto dest,
+                double routeEnhancementThreshold,
+                int radius,
+                List<String> entityPreferences,
+                boolean avoidHighways,
+                boolean avoidTolls,
+                boolean excludeOrigin,
+                boolean excludeDest,
+                int dwellTimePerStop,
+                List<List<Double>> selectedRouteCoords
+        ) throws Exception {
 
-        return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
-                radius, entityPreferences, dwellTimePerStop, encodedPolyline);
-    }
+            log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, hasSelectedCoords={}",
+                    routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest,
+                    selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
 
-    private long estimateDuration(List<CoordinateDto> coords) {
-        double totalKm = 0;
-        for (int i = 0; i < coords.size() - 1; i++) {
-            totalKm += haversine(coords.get(i).getLat(), coords.get(i).getLng(),
-                    coords.get(i + 1).getLat(), coords.get(i + 1).getLng());
+            List<CoordinateDto> routeCoords;
+            long baselineDurationMins;
+            int meandrFactorBase = 250;
+            String encodedPolyline;
+
+            if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
+                // Use pre-selected route coordinates from frontend
+                routeCoords = selectedRouteCoords.stream()
+                        .map(c -> new CoordinateDto(c.get(1), c.get(0))) // GeoJSON is [lng, lat]
+                        .collect(Collectors.toList());
+                baselineDurationMins = estimateDuration(routeCoords);
+                encodedPolyline = encodePolyline(routeCoords);
+                log.info("Using pre-selected route: {} coords, estimated {} mins", routeCoords.size(), baselineDurationMins);
+            } else {
+                // Fetch routes from Directions API
+                com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
+                com.google.maps.model.LatLng googleDest = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
+
+                // Always fetch fastest route for reference
+                DirectionsResult fastestResult;
+                try {
+                    fastestResult = DirectionsApi.newRequest(context)
+                            .origin(googleOrigin).destination(googleDest)
+                            .alternatives(false).mode(TravelMode.DRIVING).await();
+
+                } catch (com.google.maps.errors.ZeroResultsException e) {
+                    throw new RuntimeException("No fastest route found between origin and destination.", e);
+                }
+
+                if (fastestResult.routes == null || fastestResult.routes.length == 0) {
+                    throw new RuntimeException("No fastest route found between origin and destination");
+                }
+
+                long fastestRouteMins = fastestResult.routes[0].legs[0].duration.inSeconds / 60;
+                log.info("Fastest route duration: {} mins", fastestRouteMins);
+
+                // Fetch base route with restrictions
+                DirectionsApiRequest baseRequest = DirectionsApi.newRequest(context)
+                        .origin(googleOrigin).destination(googleDest)
+                        .alternatives(true).mode(TravelMode.DRIVING);
+
+                List<DirectionsApi.RouteRestriction> restrictions = new ArrayList<>();
+                if (avoidHighways) {
+                    restrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
+                }
+                if (avoidTolls) {
+                    restrictions.add(DirectionsApi.RouteRestriction.TOLLS);
+                }
+                if (!restrictions.isEmpty()) {
+                    baseRequest.avoid(restrictions.toArray(new DirectionsApi.RouteRestriction[0]));
+                }
+
+                DirectionsResult baseResult = baseRequest.await();
+                if (baseResult.routes == null || baseResult.routes.length == 0) {
+                    throw new RuntimeException("No base routes with restrictions found for beautification");
+                }
+
+                try {
+                    baseResult = DirectionsApi.newRequest(context)
+                            .origin(googleOrigin).destination(googleDest)
+                            .alternatives(false).mode(TravelMode.DRIVING).await();
+                } catch (com.google.maps.errors.ZeroResultsException e) {
+                    throw new RuntimeException("No base routes with restrictions found between origin and destination.", e);
+                }
+
+                if (fastestResult.routes == null || fastestResult.routes.length == 0) {
+                    throw new RuntimeException("No base routes with restrictions found between origin and destination");
+                }
+
+                baselineDurationMins = baseResult.routes[0].legs[0].duration.inSeconds / 60;
+                log.info("Base route with restrictions duration: {} mins (fastest was {} mins)", baselineDurationMins, fastestRouteMins);
+
+                double enhancementPct = (routeEnhancementThreshold / baselineDurationMins) * 100.0;
+                double maxAcceptableMins = baselineDurationMins * (1 + enhancementPct / 100.0);
+
+                com.google.maps.model.DirectionsRoute selectedRoute = Arrays.stream(baseResult.routes)
+                        .filter(r -> (r.legs[0].duration.inSeconds / 60.0) <= maxAcceptableMins)
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException(String.format(
+                        "No routes available within your enhancement budget of %.0f mins.", maxAcceptableMins)));
+
+                long totalSeconds = Arrays.stream(selectedRoute.legs)
+                        .mapToLong(l -> l.duration.inSeconds)
+                        .sum();
+                log.info("Selected route: {} mins", totalSeconds / 60);
+
+                String fullPolyline = concatenateLegsPolyline(selectedRoute);
+                routeCoords = decodePolylineToCoordinates(fullPolyline);
+                encodedPolyline = fullPolyline;
+            }
+
+            double enhancementPct = (routeEnhancementThreshold / meandrFactorBase) * 100.0;
+            log.info("Enhancement: {} additional mins = {}% of base route",
+                    routeEnhancementThreshold, String.format("%.1f", enhancementPct));
+            log.info("Decoded route into {} coordinate points", routeCoords.size());
+
+            return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
+                    radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline);
         }
-        return (long) (totalKm / 80.0 * 60.0);
-    }
 
-    private String encodePolyline(List<CoordinateDto> coords) {
-        List<com.google.maps.model.LatLng> points = coords.stream()
-                .map(c -> new com.google.maps.model.LatLng(c.getLat(), c.getLng()))
-                .collect(Collectors.toList());
-        return com.google.maps.internal.PolylineEncoding.encode(points);
-    }
+        public Map<String, Object> routeWithWaypoints(
+                CoordinateDto origin,
+                CoordinateDto dest,
+                List<ScenicSpot> waypoints) throws Exception {
 
-    /**
-     * Encode coordinates to Google polyline format.
-     */
-    /**
-     * Generate Google Maps debug URL for scenic route.
-     */
-    /**
-     * Main beautifyRoute method.
-     */
-    /**
-     * Core beautification engine. Fed Google route geometry, scores and selects
-     * scenic waypoints within the enhancement budget.
-     *
-     * @param routeCoords
-     * @param baselineDurationMins
-     * @param routeEnhancementThreshold
-     * @param radius
-     * @param entityPreferences
-     * @param dwellTimePerStop
-     * @param encodedPolyline
-     * @return
-     */
-    public BeautifiedRouteResponseDto beautifyRoute(
-            List<CoordinateDto> routeCoords,
-            long baselineDurationMins,
-            double routeEnhancementThreshold,
-            int radius,
-            List<String> entityPreferences,
-            int dwellTimePerStop,
-            String encodedPolyline
-    ) {
-        List<LatLng> path = routeCoords.stream()
-                .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
-                .collect(Collectors.toList());
+            com.google.maps.model.LatLng googleOrigin
+                    = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
+            com.google.maps.model.LatLng googleDest
+                    = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
 
-        double totalPathLength = calculateTotalPathLength(path);
-        LatLng originPoint = path.get(0);
-        LatLng destinationPoint = path.get(path.size() - 1);
+            List<ScenicSpot> mutableWaypoints = new ArrayList<>(waypoints);
 
-        // Increase sample density — aim for one search every ~25km
-        int samplingStep = Math.max(1, (int) (path.size() / (totalPathLength / 25.0)));
-        log.info("Sampling: {} points, step={}, ~{} km between samples",
-                path.size(), samplingStep, String.format("%.1f", totalPathLength / (path.size() / (double) samplingStep)));
-        int dynamicRadius = Math.min(10000, (int) (radius * (1 + (routeEnhancementThreshold / 1000.0))));
+            while (!mutableWaypoints.isEmpty()) {
+                DirectionsApiRequest request = DirectionsApi.newRequest(context)
+                        .origin(googleOrigin)
+                        .destination(googleDest)
+                        .mode(TravelMode.DRIVING);
 
-        List<ScenicSpot> candidates = findScenicSpotsAlongPath(
-                path,
-                samplingStep,
-                dynamicRadius,
-                entityPreferences,
-                totalPathLength,
-                destinationPoint,
-                (int) routeEnhancementThreshold
-        );
+                String[] waypointStrings = mutableWaypoints.stream()
+                        .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
+                        ? "place_id:" + s.getPlaceId()
+                        : s.getLat() + "," + s.getLng())
+                        .toArray(String[]::new);
+                request.waypoints(waypointStrings);
 
-        List<ScenicSpot> topCandidates = getEscalatedSelection(
-                candidates,
-                totalPathLength,
-                baselineDurationMins,
-                routeEnhancementThreshold,
-                dwellTimePerStop
-        );
-
-        log.info("Selected {} waypoints from {} candidates", topCandidates.size(), candidates.size());
-
-        // Attempt routing with self-healing, fall back to polyline-only on failure
-        RoutingResultWithWaypoints routing;
-        try {
-            routing = fetchBeautifiedPathDetails(originPoint, destinationPoint, topCandidates);
-            log.info("Routed with {} waypoints ({} removed during self-healing)",
-                    routing.getActualWaypoints().size(),
-                    topCandidates.size() - routing.getActualWaypoints().size());
-        } catch (Exception e) {
-            log.error("Routing failed, returning polyline-only result: {}", e.getMessage());
-            routing = new RoutingResultWithWaypoints(encodedPolyline, "", new ArrayList<>(), topCandidates);
+                try {
+                    DirectionsResult result = request.await();
+                    if (result.routes.length > 0) {
+                        String polyline = concatenateLegsPolyline(result.routes[0]);
+                        long totalSeconds = Arrays.stream(result.routes[0].legs)
+                                .mapToLong(l -> l.duration.inSeconds)
+                                .sum();
+                        return Map.of(
+                                "encodedPolyline", polyline,
+                                "durationMins", totalSeconds / 60.0
+                        );
+                    }
+                } catch (com.google.maps.errors.ZeroResultsException e) {
+                    ScenicSpot removed = mutableWaypoints.stream()
+                            .min(Comparator.comparingDouble(ScenicSpot::getScore))
+                            .get();
+                    mutableWaypoints.remove(removed);
+                    log.warn("Reroute: removed lowest-scoring waypoint '{}'. {} remaining.",
+                            removed.getName(), mutableWaypoints.size());
+                }
+            }
+            throw new RuntimeException("Could not find a valid route with any waypoints");
         }
 
-        List<ScenicSpot> actualWaypoints = routing.getActualWaypoints();
+        private long estimateDuration(List<CoordinateDto> coords) {
+            double totalKm = 0;
+            for (int i = 0; i < coords.size() - 1; i++) {
+                totalKm += haversine(coords.get(i).getLat(), coords.get(i).getLng(),
+                        coords.get(i + 1).getLat(), coords.get(i + 1).getLng());
+            }
+            return (long) (totalKm / 80.0 * 60.0);
+        }
 
-        Set<String> routedIds = actualWaypoints.stream()
-                .map(ScenicSpot::getPlaceId)
-                .collect(Collectors.toSet());
+        private String encodePolyline(List<CoordinateDto> coords) {
+            List<com.google.maps.model.LatLng> points = coords.stream()
+                    .map(c -> new com.google.maps.model.LatLng(c.getLat(), c.getLng()))
+                    .collect(Collectors.toList());
+            return com.google.maps.internal.PolylineEncoding.encode(points);
+        }
 
-        List<ScenicSpot> rejectedWaypoints = candidates.stream()
-                .filter(spot -> !routedIds.contains(spot.getPlaceId()))
-                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
-                .collect(Collectors.toList());
+        /**
+         * Encode coordinates to Google polyline format.
+         */
+        /**
+         * Generate Google Maps debug URL for scenic route.
+         */
+        /**
+         * Main beautifyRoute method.
+         */
+        /**
+         * Core beautification engine. Fed Google route geometry, scores and
+         * selects scenic waypoints within the enhancement budget.
+         *
+         * @param routeCoords
+         * @param baselineDurationMins
+         * @param routeEnhancementThreshold
+         * @param radius
+         * @param entityPreferences
+         * @param dwellTimePerStop
+         * @param encodedPolyline
+         * @return
+         */
+        public BeautifiedRouteResponseDto beautifyRoute(
+                List<CoordinateDto> routeCoords,
+                long baselineDurationMins,
+                double routeEnhancementThreshold,
+                int radius,
+                List<String> entityPreferences,
+                boolean excludeOrigin,
+                boolean excludeDest,
+                int dwellTimePerStop,
+                String encodedPolyline
+        ) {
+            List<LatLng> path = routeCoords.stream()
+                    .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
+                    .collect(Collectors.toList());
 
-        double totalDetourMins = actualWaypoints.stream()
-                .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
-                .sum();
+            double totalPathLength = calculateTotalPathLength(path);
+            originPoint = path.get(0);
+            destinationPoint = path.get(path.size() - 1);
 
-        double actualEnhancement = baselineDurationMins > 0
-                ? (totalDetourMins / baselineDurationMins) * 100.0
-                : 0.0;
+            // Increase sample density — aim for one search every ~25km
+            int samplingStep = Math.max(1, (int) (path.size() / (totalPathLength / 25.0)));
+            log.info("Sampling: {} points, step={}, ~{} km between samples",
+                    path.size(), samplingStep, String.format("%.1f", totalPathLength / (path.size() / (double) samplingStep)));
+            int dynamicRadius = Math.min(10000, (int) (radius * (1 + (routeEnhancementThreshold / 1000.0))));
 
-        double enhancementBudgetMins = baselineDurationMins * (routeEnhancementThreshold / 100.0);
-
-        String warningMessage = null;
-        if (Math.abs(actualEnhancement - routeEnhancementThreshold) > 15) {
-            warningMessage = String.format(
-                    "Could not meet your enhancement target of %.0f%%. "
-                    + "Delivered %.1f%% enhancement (%.0f of %.0f mins budget used).",
-                    routeEnhancementThreshold,
-                    actualEnhancement,
-                    totalDetourMins,
-                    enhancementBudgetMins
+            List<ScenicSpot> candidates = findScenicSpotsAlongPath(
+                    path,
+                    samplingStep,
+                    dynamicRadius,
+                    entityPreferences,
+                    totalPathLength,
+                    destinationPoint,
+                    (int) routeEnhancementThreshold
             );
-            log.warn(warningMessage);
+
+            List<ScenicSpot> topCandidates = getEscalatedSelection(
+                    candidates,
+                    totalPathLength,
+                    baselineDurationMins,
+                    routeEnhancementThreshold,
+                    dwellTimePerStop,
+                    excludeOrigin,
+                    excludeDest
+            );
+
+            log.info("Selected {} waypoints from {} candidates", topCandidates.size(), candidates.size());
+
+            // Attempt routing with self-healing, fall back to polyline-only on failure
+            RoutingResultWithWaypoints routing;
+            try {
+                routing = fetchBeautifiedPathDetails(originPoint, destinationPoint, topCandidates);
+                log.info("Routed with {} waypoints ({} removed during self-healing)",
+                        routing.getActualWaypoints().size(),
+                        topCandidates.size() - routing.getActualWaypoints().size());
+            } catch (Exception e) {
+                log.error("Routing failed, returning polyline-only result: {}", e.getMessage());
+                routing = new RoutingResultWithWaypoints(encodedPolyline, "", new ArrayList<>(), topCandidates);
+            }
+
+            List<ScenicSpot> actualWaypoints = routing.getActualWaypoints();
+
+            Set<String> routedIds = actualWaypoints.stream()
+                    .map(ScenicSpot::getPlaceId)
+                    .collect(Collectors.toSet());
+
+            List<ScenicSpot> rejectedWaypoints = candidates.stream()
+                    .filter(spot -> !routedIds.contains(spot.getPlaceId()))
+                    .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
+                    .collect(Collectors.toList());
+
+            double totalDetourMins = actualWaypoints.stream()
+                    .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
+                    .sum();
+
+            double actualEnhancement = baselineDurationMins > 0
+                    ? (totalDetourMins / baselineDurationMins) * 100.0
+                    : 0.0;
+
+            double enhancementBudgetMins = baselineDurationMins * (routeEnhancementThreshold / 100.0);
+
+            String warningMessage = null;
+            if (Math.abs(actualEnhancement - routeEnhancementThreshold) > 15) {
+                warningMessage = String.format(
+                        "Could not meet your enhancement target of %.0f%%. "
+                        + "Delivered %.1f%% enhancement (%.0f of %.0f mins budget used).",
+                        routeEnhancementThreshold,
+                        actualEnhancement,
+                        totalDetourMins,
+                        enhancementBudgetMins
+                );
+                log.warn(warningMessage);
+            }
+
+            return new BeautifiedRouteResponseDto(
+                    actualWaypoints.size(),
+                    routing.getPolyline().isEmpty() ? encodedPolyline : routing.getPolyline(),
+                    routing.getDebugUrl(),
+                    actualWaypoints,
+                    rejectedWaypoints,
+                    routing.getSteps(),
+                    totalDetourMins,
+                    baselineDurationMins,
+                    routeEnhancementThreshold,
+                    warningMessage
+            );
         }
 
-        return new BeautifiedRouteResponseDto(
-                actualWaypoints.size(),
-                routing.getPolyline().isEmpty() ? encodedPolyline : routing.getPolyline(),
-                routing.getDebugUrl(),
-                actualWaypoints,
-                rejectedWaypoints,
-                routing.getSteps(),
-                totalDetourMins,
-                baselineDurationMins,
-                routeEnhancementThreshold,
-                warningMessage
-        );
-    }
+        /**
+         * Fetch route details with self-healing that removes problematic
+         * waypoints. Google Directions API hard limit: 23 intermediate
+         * waypoints (+ origin + dest = 25 total). Self-healing removes
+         * lowest-scoring waypoint on rejection, not highest-detour.
+         */
+        /**
+         * Fetch route details with self-healing that removes problematic
+         * waypoints. Google Directions API hard limit: 23 intermediate
+         * waypoints (+ origin + dest = 25 total). Self-healing removes
+         * lowest-scoring waypoint on rejection, not highest-detour.
+         */
+        private RoutingResultWithWaypoints fetchBeautifiedPathDetails(
+                LatLng origin,
+                LatLng dest,
+                List<ScenicSpot> waypoints
+        ) throws Exception {
 
-    /**
-     * Fetch route details with self-healing that removes problematic waypoints.
-     * Google Directions API hard limit: 23 intermediate waypoints (+ origin +
-     * dest = 25 total). Self-healing removes lowest-scoring waypoint on
-     * rejection, not highest-detour.
-     */
-    /**
-     * Fetch route details with self-healing that removes problematic waypoints.
-     * Google Directions API hard limit: 23 intermediate waypoints (+ origin +
-     * dest = 25 total). Self-healing removes lowest-scoring waypoint on
-     * rejection, not highest-detour.
-     */
-    private RoutingResultWithWaypoints fetchBeautifiedPathDetails(
-            LatLng origin,
-            LatLng dest,
-            List<ScenicSpot> waypoints
-    ) throws Exception {
+            waypoints.forEach(s -> log.info("Waypoint: {} placeId={}", s.getName(), s.getPlaceId()));
 
-        /* Enforce Google's 23 waypoint limit upfront, keeping highest-scoring
-        List<ScenicSpot> workingWaypoints = waypoints.stream()
-                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
-                .limit(23)
-                .sorted(Comparator.comparingDouble(ScenicSpot::getDistFromStart))
-                .collect(Collectors.toCollection(ArrayList::new));
+            com.google.maps.model.LatLng googleOrigin
+                    = new com.google.maps.model.LatLng(origin.lat, origin.lng);
+            com.google.maps.model.LatLng googleDest
+                    = new com.google.maps.model.LatLng(dest.lat, dest.lng);
 
-        if (workingWaypoints.size() < waypoints.size()) {
-            log.info("Capped waypoints from {} to 23 (Google limit), kept highest-scoring",
-                    waypoints.size());
-        }*/
-        waypoints.forEach(s -> log.info("Waypoint: {} placeId={}", s.getName(), s.getPlaceId()));
+            while (!waypoints.isEmpty()) {
+                DirectionsApiRequest request = DirectionsApi.newRequest(context)
+                        .origin(googleOrigin)
+                        .destination(googleDest)
+                        .mode(TravelMode.DRIVING);
 
-        com.google.maps.model.LatLng googleOrigin
-                = new com.google.maps.model.LatLng(origin.lat, origin.lng);
-        com.google.maps.model.LatLng googleDest
-                = new com.google.maps.model.LatLng(dest.lat, dest.lng);
+                String[] waypointStrings = waypoints.stream()
+                        .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
+                        ? "place_id:" + s.getPlaceId()
+                        : s.getLat() + "," + s.getLng())
+                        .toArray(String[]::new);
+                request.waypoints(waypointStrings);
 
-        while (!waypoints.isEmpty()) {
-            DirectionsApiRequest request = DirectionsApi.newRequest(context)
-                    .origin(googleOrigin)
-                    .destination(googleDest)
-                    .mode(TravelMode.DRIVING);
+                try {
+                    DirectionsResult result = request.await();
+                    if (result.routes.length > 0) {
+                        log.info("Routing succeeded with {} waypoints", waypoints.size());
+                        return new RoutingResultWithWaypoints(
+                                concatenateLegsPolyline(result.routes[0]),
+                                generateDebugUrl(origin, dest, waypoints),
+                                processSteps(result),
+                                waypoints
+                        );
+                    }
+                } catch (com.google.maps.errors.ZeroResultsException e) {
+                    // Remove lowest-scoring waypoint and retry
+                    ScenicSpot removed = waypoints.stream()
+                            .min(Comparator.comparingDouble(ScenicSpot::getScore))
+                            .get();
+                    waypoints.remove(removed);
+                    log.warn("Google rejected route — removed lowest-scoring waypoint '{}' (score={}). {} remaining.",
+                            removed.getName(), String.format("%.1f", removed.getScore()), waypoints.size());
+                }
+            }
 
-            String[] waypointStrings = waypoints.stream()
-                    .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
-                    ? "place_id:" + s.getPlaceId()
-                    : s.getLat() + "," + s.getLng())
-                    .toArray(String[]::new);
-            request.waypoints(waypointStrings);
-
+            // Last attempt: direct route with no waypoints
             try {
-                DirectionsResult result = request.await();
+                DirectionsResult result = DirectionsApi.newRequest(context)
+                        .origin(googleOrigin)
+                        .destination(googleDest)
+                        .mode(TravelMode.DRIVING)
+                        .await();
                 if (result.routes.length > 0) {
-                    log.info("Routing succeeded with {} waypoints", waypoints.size());
+                    log.warn("Fell back to direct route — all waypoints rejected");
                     return new RoutingResultWithWaypoints(
-                            result.routes[0].overviewPolyline.getEncodedPath(),
-                            generateDebugUrl(origin, dest, waypoints),
+                            concatenateLegsPolyline(result.routes[0]),
+                            generateDebugUrl(origin, dest, new ArrayList<>()),
                             processSteps(result),
-                            waypoints
+                            new ArrayList<>()
                     );
                 }
-            } catch (com.google.maps.errors.ZeroResultsException e) {
-                // Remove lowest-scoring waypoint and retry
-                ScenicSpot removed = waypoints.stream()
-                        .min(Comparator.comparingDouble(ScenicSpot::getScore))
-                        .get();
-                waypoints.remove(removed);
-                log.warn("Google rejected route — removed lowest-scoring waypoint '{}' (score={}). {} remaining.",
-                        removed.getName(), String.format("%.1f", removed.getScore()), waypoints.size());
+            } catch (Exception ex) {
+                log.error("Direct route fallback also failed: {}", ex.getMessage());
             }
+
+            log.error("Could not generate route even after removing all waypoints");
+            return new RoutingResultWithWaypoints("", "", new ArrayList<>(), new ArrayList<>());
         }
 
-        // Last attempt: direct route with no waypoints
-        try {
-            DirectionsResult result = DirectionsApi.newRequest(context)
-                    .origin(googleOrigin)
-                    .destination(googleDest)
-                    .mode(TravelMode.DRIVING)
-                    .await();
-            if (result.routes.length > 0) {
-                log.warn("Fell back to direct route — all waypoints rejected");
-                return new RoutingResultWithWaypoints(
-                        result.routes[0].overviewPolyline.getEncodedPath(),
-                        generateDebugUrl(origin, dest, new ArrayList<>()),
-                        processSteps(result),
-                        new ArrayList<>()
-                );
+        public List<ScenicSpot> getEscalatedSelection(
+                List<ScenicSpot> allFoundSpots,
+                double totalPathLength,
+                long originalTripMins,
+                double routeEnhancementThreshold,
+                int dwellTimePerStop,
+                boolean excludeOrigin,
+                boolean excludeDest
+        ) {
+            double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
+            int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
+            double segmentLength = totalPathLength / numSegments;
+
+            // Scale minimum segment budget with route length so long routes can afford city stops.
+            double avgStopCostMins = 5.0 + (totalPathLength / 3000.0) * 15.0;
+            double minSegmentBudget = avgStopCostMins + dwellTimePerStop;
+            double budgetPerSegment = Math.max(minSegmentBudget, totalTimeBudget / numSegments);
+
+            double[] segmentBudget = new double[numSegments];
+            double[] segmentSpent = new double[numSegments];
+            Arrays.fill(segmentBudget, budgetPerSegment);
+
+            List<ScenicSpot> finalSelection = new ArrayList<>();
+
+            log.info("=== ESCALATED SELECTION START ===");
+            log.info("Route: totalLength={} km, baseTrip={} mins, enhancement={}%, totalBudget={} mins",
+                    String.format("%.1f", totalPathLength), originalTripMins,
+                    routeEnhancementThreshold, String.format("%.1f", totalTimeBudget));
+            log.info("Segments: count={}, {} km each, {} mins budget each",
+                    numSegments, String.format("%.1f", segmentLength), String.format("%.1f", budgetPerSegment));
+            log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
+
+            log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
+
+            log.info("excludeDest check: totalPathLength={} km, threshold={} km, max distFromStart={} km",
+                    String.format("%.1f", totalPathLength),
+                    String.format("%.1f", totalPathLength - 40.0),
+                    String.format("%.1f", allFoundSpots.stream()
+                            .mapToDouble(ScenicSpot::getDistFromStart)
+                            .max().orElse(0)));
+
+            
+
+// Exclude stops near origin and destination
+            if (excludeOrigin || excludeDest) {
+                final double EXCLUDE_RADIUS_KM = 40.0;
+
+                // Get origin and dest coords for haversine check
+                final double originLat = originPoint.lat;
+                final double originLng = originPoint.lng;
+                final double destLat = destinationPoint.lat;
+                final double destLng = destinationPoint.lng;
+
+                allFoundSpots = allFoundSpots.stream()
+                        .filter(wp -> {
+                            if (excludeOrigin && haversineKm(wp.getLat(), wp.getLng(),
+                                    originLat, originLng) < EXCLUDE_RADIUS_KM) {
+                                return false;
+                            }
+                            if (excludeDest && haversineKm(wp.getLat(), wp.getLng(),
+                                    destLat, destLng) < EXCLUDE_RADIUS_KM) {
+                                return false;
+                            }
+                            return true;
+                        })
+                        .collect(Collectors.toList());
             }
-        } catch (Exception ex) {
-            log.error("Direct route fallback also failed: {}", ex.getMessage());
-        }
 
-        log.error("Could not generate route even after removing all waypoints");
-        return new RoutingResultWithWaypoints("", "", new ArrayList<>(), new ArrayList<>());
-    }
+            log.info("After exclude filter: {} candidates remain (excludeOrigin={}, excludeDest={})",
+                    allFoundSpots.size(), excludeOrigin, excludeDest);
 
-    public List<ScenicSpot> getEscalatedSelection(
-            List<ScenicSpot> allFoundSpots,
-            double totalPathLength,
-            long originalTripMins,
-            double routeEnhancementThreshold,
-            int dwellTimePerStop
-    ) {
-        double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
-        int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
-        double segmentLength = totalPathLength / numSegments;
+            log.info("After exclude: max distFromStart={} km",
+                    String.format("%.1f", allFoundSpots.stream()
+                            .mapToDouble(ScenicSpot::getDistFromStart)
+                            .max().orElse(0)));
+        
 
-        // Scale minimum segment budget with route length so long routes can afford city stops.
-        double avgStopCostMins = 5.0 + (totalPathLength / 3000.0) * 15.0;
-        double minSegmentBudget = avgStopCostMins + dwellTimePerStop;
-        double budgetPerSegment = Math.max(minSegmentBudget, totalTimeBudget / numSegments);
-
-        double[] segmentBudget = new double[numSegments];
-        double[] segmentSpent = new double[numSegments];
-        Arrays.fill(segmentBudget, budgetPerSegment);
-
-        List<ScenicSpot> finalSelection = new ArrayList<>();
-
-        log.info("=== ESCALATED SELECTION START ===");
-        log.info("Route: totalLength={} km, baseTrip={} mins, enhancement={}%, totalBudget={} mins",
-                String.format("%.1f", totalPathLength), originalTripMins,
-                routeEnhancementThreshold, String.format("%.1f", totalTimeBudget));
-        log.info("Segments: count={}, {} km each, {} mins budget each",
-                numSegments, String.format("%.1f", segmentLength), String.format("%.1f", budgetPerSegment));
-        log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
-
-// =============================================================
-// PASS 0: Landmark anchors, clustering, and empty segment fill
-// =============================================================
+        // =============================================================
+        // PASS 0: Landmark anchors, clustering, and empty segment fill
+        // =============================================================
         final int MAX_CLUSTER_COMPANIONS = 2;
         List<ScenicSpot> pass0Selections = new ArrayList<>();
         Set<String> landmarkPlaceIds = new HashSet<>();
+        double pass0Remaining = totalTimeBudget;
 
 // --- Pass 0a: Best by popularity per segment (min 4.5 rating, 1000 reviews) ---
-        log.info("--- PASS 0a: Landmark anchors ---");
+        log.info ("--- PASS 0a: Landmark anchors ---");
         for (int i = 0; i < numSegments; i++) {
             final int seg = i;
             Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
@@ -489,19 +613,35 @@ public class RouteBeautifierService {
 
             if (bestOpt.isPresent()) {
                 ScenicSpot best = bestOpt.get();
-                best.setSegmentIndex(seg);
-                pass0Selections.add(best);
-                landmarkPlaceIds.add(best.getPlaceId());
-                log.info("  Landmark seg={}: {} (rating={}, reviews={})",
-                        seg, best.getName(), best.getRating(), best.getUserRatingsTotal());
+                double cost = best.getDetour() + dwellTimePerStop;
+                if (cost <= pass0Remaining) {
+                    best.setSegmentIndex(seg);
+                    pass0Selections.add(best);
+                    landmarkPlaceIds.add(best.getPlaceId());
+                    pass0Remaining -= cost;
+                    log.info("  Landmark seg={}: {} (rating={}, reviews={}, cost={})",
+                            seg, best.getName(), best.getRating(), best.getUserRatingsTotal(),
+                            String.format("%.1f", cost));
+                } else {
+                    log.info("  Landmark seg={}: {} skipped — over budget (cost={}, remaining={})",
+                            seg, best.getName(),
+                            String.format("%.1f", cost),
+                            String.format("%.1f", pass0Remaining));
+                }
             }
         }
 
 // --- Pass 0b: Cluster companions for each landmark ---
-        log.info("--- PASS 0b: Cluster companions ---");
+        log.info (
+        "--- PASS 0b: Cluster companions ---");
         List<ScenicSpot> pass0aSnapshot = new ArrayList<>(pass0Selections);
+
         for (ScenicSpot landmark : pass0aSnapshot) {
-            allFoundSpots.stream()
+            if (pass0Remaining <= 0) {
+                break;
+            }
+
+            List<ScenicSpot> candidates = allFoundSpots.stream()
                     .filter(wp -> wp.getRating() >= 4.3)
                     .filter(wp -> wp.getUserRatingsTotal() >= 500)
                     .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
@@ -509,20 +649,35 @@ public class RouteBeautifierService {
                     wp.getLat(), wp.getLng()) <= 10.0)
                     .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
                     .limit(MAX_CLUSTER_COMPANIONS)
-                    .forEach(companion -> {
-                        companion.setSegmentIndex(landmark.getSegmentIndex());
-                        pass0Selections.add(companion);
-                        landmarkPlaceIds.add(companion.getPlaceId());
-                        log.info("  Companion for {}: {} (rating={}, reviews={})",
-                                landmark.getName(), companion.getName(),
-                                companion.getRating(), companion.getUserRatingsTotal());
-                    });
+                    .collect(Collectors.toList());
+
+            for (ScenicSpot companion : candidates) {
+                if (pass0Remaining <= 0) {
+                    break;
+                }
+                double cost = companion.getDetour() + dwellTimePerStop;
+                if (cost <= pass0Remaining) {
+                    companion.setSegmentIndex(landmark.getSegmentIndex());
+                    pass0Selections.add(companion);
+                    landmarkPlaceIds.add(companion.getPlaceId());
+                    pass0Remaining -= cost;
+                    log.info("  Companion for {}: {} (rating={}, reviews={}, cost={})",
+                            landmark.getName(), companion.getName(),
+                            companion.getRating(), companion.getUserRatingsTotal(),
+                            String.format("%.1f", cost));
+                }
+            }
         }
 
 // --- Pass 0d: Fill empty segments with best available anchor ---
-        log.info("--- PASS 0d: Empty segment fill ---");
+        log.info (
+        "--- PASS 0d: Empty segment fill ---");
         for (int i = 0; i < numSegments; i++) {
+            if (pass0Remaining <= 0) {
+                break;
+            }
             final int seg = i;
+
             boolean segmentHasSelection = pass0Selections.stream()
                     .anyMatch(wp -> wp.getSegmentIndex() == seg);
 
@@ -537,29 +692,48 @@ public class RouteBeautifierService {
 
                 if (bestOpt.isPresent()) {
                     ScenicSpot best = bestOpt.get();
-                    best.setSegmentIndex(seg);
-                    pass0Selections.add(best);
-                    landmarkPlaceIds.add(best.getPlaceId());
-                    log.info("  Filled seg={}: {} (rating={}, reviews={})",
-                            seg, best.getName(), best.getRating(), best.getUserRatingsTotal());
+                    double cost = best.getDetour() + dwellTimePerStop;
+                    if (cost <= pass0Remaining) {
+                        best.setSegmentIndex(seg);
+                        pass0Selections.add(best);
+                        landmarkPlaceIds.add(best.getPlaceId());
+                        pass0Remaining -= cost;
+                        log.info("  Filled seg={}: {} (rating={}, reviews={}, cost={})",
+                                seg, best.getName(), best.getRating(), best.getUserRatingsTotal(),
+                                String.format("%.1f", cost));
 
-                    // Cluster companions for this anchor too
-                    allFoundSpots.stream()
-                            .filter(wp -> wp.getRating() >= 4.3)
-                            .filter(wp -> wp.getUserRatingsTotal() >= 500)
-                            .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
-                            .filter(wp -> haversineKm(best.getLat(), best.getLng(),
-                            wp.getLat(), wp.getLng()) <= 10.0)
-                            .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
-                            .limit(MAX_CLUSTER_COMPANIONS)
-                            .forEach(companion -> {
+                        // Cluster companions for this anchor
+                        List<ScenicSpot> companionCandidates = allFoundSpots.stream()
+                                .filter(wp -> wp.getRating() >= 4.3)
+                                .filter(wp -> wp.getUserRatingsTotal() >= 500)
+                                .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
+                                .filter(wp -> haversineKm(best.getLat(), best.getLng(),
+                                wp.getLat(), wp.getLng()) <= 10.0)
+                                .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
+                                .limit(MAX_CLUSTER_COMPANIONS)
+                                .collect(Collectors.toList());
+
+                        for (ScenicSpot companion : companionCandidates) {
+                            if (pass0Remaining <= 0) {
+                                break;
+                            }
+                            double companionCost = companion.getDetour() + dwellTimePerStop;
+                            if (companionCost <= pass0Remaining) {
                                 companion.setSegmentIndex(seg);
                                 pass0Selections.add(companion);
                                 landmarkPlaceIds.add(companion.getPlaceId());
-                                log.info("    Companion: {} (rating={}, reviews={})",
+                                pass0Remaining -= companionCost;
+                                log.info("    Pass 0d companion: {} (rating={}, reviews={})",
                                         companion.getName(), companion.getRating(),
                                         companion.getUserRatingsTotal());
-                            });
+                            }
+                        }
+                    } else {
+                        log.info("  seg={}: {} skipped — over budget (cost={}, remaining={})",
+                                seg, best.getName(),
+                                String.format("%.1f", cost),
+                                String.format("%.1f", pass0Remaining));
+                    }
                 } else {
                     log.info("  seg={}: no qualifying anchor found", seg);
                 }
@@ -567,24 +741,33 @@ public class RouteBeautifierService {
         }
 
 // --- Remove all Pass 0 selections from candidate pool ---
-        allFoundSpots = allFoundSpots.stream()
+        allFoundSpots  = allFoundSpots.stream()
                 .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
                 .collect(Collectors.toList());
 
 // --- Deduct Pass 0 budget and add to final selection ---
-        double pass0BudgetUsed = pass0Selections.stream()
-                .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
-                .sum();
-        totalTimeBudget -= pass0BudgetUsed;
-        finalSelection.addAll(pass0Selections);
+        double pass0BudgetUsed = totalTimeBudget - pass0Remaining;
+        totalTimeBudget  = pass0Remaining;
 
-        log.info("--- PASS 0 COMPLETE: {} spots selected, {:.1f} mins used, {:.1f} mins remaining ---",
+        finalSelection.addAll (pass0Selections);
+
+// Pre-populate segmentSpent with Pass 0 costs before Pass 1
+        for (ScenicSpot spot : pass0Selections) {
+            int seg = spot.getSegmentIndex();
+            if (seg >= 0 && seg < numSegments) {
+                segmentSpent[seg] += spot.getDetour() + dwellTimePerStop;
+            }
+        }
+
+        log.info (
+        "--- PASS 0 COMPLETE: {} spots selected, {} mins used, {} mins remaining ---",
                 pass0Selections.size(),
-                pass0BudgetUsed,
-                totalTimeBudget);
+                String.format("%.1f", pass0BudgetUsed),
+                String.format("%.1f", totalTimeBudget));
 
         // Group candidates by segment, sorted by score descending
         Map<Integer, List<ScenicSpot>> bySegment = new HashMap<>();
+
         for (int i = 0; i < numSegments; i++) {
             bySegment.put(i, new ArrayList<>());
         }
@@ -622,7 +805,8 @@ public class RouteBeautifierService {
         }
 
         // --- Pass 1: Initial per-segment selection ---
-        log.info("--- PASS 1: Initial per-segment selection ---");
+        log.info (
+        "--- PASS 1: Initial per-segment selection ---");
         for (int seg = 0; seg < numSegments; seg++) {
             double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
             if (globalSpent >= totalTimeBudget) {
@@ -645,14 +829,18 @@ public class RouteBeautifierService {
 
         long pass1Count = finalSelection.size();
         double pass1Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-        log.info("Pass 1 complete: {} waypoints selected, {}/{} mins budget used ({}%)",
+
+        log.info (
+
+        "Pass 1 complete: {} waypoints selected, {}/{} mins budget used ({}%)",
                 pass1Count,
                 String.format("%.1f", pass1Spent),
                 String.format("%.1f", totalTimeBudget),
                 Math.round((pass1Spent / totalTimeBudget) * 100));
 
         // --- Pass 2: Budget diffusion ---
-        log.info("--- PASS 2: Budget diffusion ---");
+        log.info (
+        "--- PASS 2: Budget diffusion ---");
         boolean anyDiffused = true;
         int diffusionRound = 0;
         Set<Integer> exhaustedSources = new HashSet<>();
@@ -764,8 +952,13 @@ public class RouteBeautifierService {
         }
 
         double finalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-        log.info("=== ESCALATED SELECTION COMPLETE ===");
-        log.info("Waypoints: {} selected | Actual time cost: {}/{} mins ({}%) | Diffusion added: {}",
+
+        log.info (
+
+        "=== ESCALATED SELECTION COMPLETE ===");
+        log.info (
+
+        "Waypoints: {} selected | Actual time cost: {}/{} mins ({}%) | Diffusion added: {}",
                 finalSelection.size(),
                 String.format("%.1f", finalSpent),
                 String.format("%.1f", totalTimeBudget),
@@ -781,7 +974,10 @@ public class RouteBeautifierService {
                     String.format("%.1f", segmentBudget[seg]));
         }
 
-        finalSelection.sort(Comparator.comparingDouble(ScenicSpot::getDistFromStart));
+        finalSelection.sort (Comparator.comparingDouble
+    
+
+    (ScenicSpot::getDistFromStart));
         return finalSelection;
     }
 
@@ -1148,6 +1344,16 @@ public class RouteBeautifierService {
                     path.get(i + 1).lat, path.get(i + 1).lng);
         }
         return total;
+    }
+
+    private String concatenateLegsPolyline(DirectionsRoute route) {
+        List<com.google.maps.model.LatLng> allPoints = new ArrayList<>();
+        for (DirectionsLeg leg : route.legs) {
+            for (DirectionsStep step : leg.steps) {
+                allPoints.addAll(step.polyline.decodePath());
+            }
+        }
+        return new com.google.maps.model.EncodedPolyline(allPoints).getEncodedPath();
     }
 
     /**
