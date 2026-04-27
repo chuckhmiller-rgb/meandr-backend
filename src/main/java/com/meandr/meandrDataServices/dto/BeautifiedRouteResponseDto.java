@@ -17,6 +17,15 @@ public class BeautifiedRouteResponseDto {
     private List<ScenicSpot> selectedWaypoints;
     private List<ScenicSpot> rejectedWaypoints;
     private List<RouteStepSummaryDto> beautifiedRoute;
+    private String originName;
+    private String destinationName;
+    private int dwellTimePerStop;
+    private double routeEnhancementThreshold;
+    private boolean avoidHighways;
+    private boolean avoidTolls;
+    private boolean excludeOrigin;
+    private boolean excludeDest;
+    private List<String> entityPreferences;
     private TripSummary summary;
     private String warningMessage;
 
@@ -42,6 +51,8 @@ public class BeautifiedRouteResponseDto {
         this.rejectedWaypoints = rejectedWaypoints;
         this.beautifiedRoute = beautifiedRoute;
         this.warningMessage = warningMessage;
+        
+        
 
         double enhancementBudgetMins = originalDurationMins * (routeEnhancementThreshold / 100.0);
 

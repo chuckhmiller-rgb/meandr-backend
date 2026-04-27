@@ -92,6 +92,17 @@ public class RouteBeautifierController {
                 request.getSelectedRouteCoords()
         );
 
+        // Echo request parameters back in response
+        response.setOriginName(request.getOriginName());
+        response.setDestinationName(request.getDestinationName());
+        response.setAvoidHighways(request.isAvoidHighways());
+        response.setAvoidTolls(request.isAvoidTolls());
+        response.setExcludeOrigin(request.isExcludeOrigin());
+        response.setExcludeDest(request.isExcludeDest());
+        response.setEntityPreferences(request.getEntityPreferences());
+        response.setDwellTimePerStop(request.getDwellTimePerStop());
+        response.setRouteEnhancementThreshold(request.getRouteEnhancementThreshold());
+
         return ResponseEntity.ok(response);
     }
 
