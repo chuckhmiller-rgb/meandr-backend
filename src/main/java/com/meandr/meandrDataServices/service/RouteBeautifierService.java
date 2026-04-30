@@ -387,6 +387,14 @@ public class RouteBeautifierService {
                 .map(ScenicSpot::getPlaceId)
                 .collect(Collectors.toSet());
 
+        // Ensure all candidates have a score before building rejected list
+        for (ScenicSpot spot : candidates) {
+            if (spot.getScore() == 0) {
+                spot.setScore(spot.getRating() * Math.log(Math.max(1, spot.getUserRatingsTotal())));
+            }
+        }
+
+        
         List<ScenicSpot> rejectedWaypoints = candidates.stream()
                 .filter(spot -> !routedIds.contains(spot.getPlaceId()))
                 .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
@@ -588,20 +596,128 @@ public class RouteBeautifierService {
                         .max().orElse(0)));
 
         // =============================================================
-        // PASS 0: Landmark anchors, clustering, and empty segment fill
-        // =============================================================
-        final int MAX_CLUSTER_COMPANIONS = 2;
+// PASS 0: Global scoring with balanced segment distribution
+// =============================================================
         List<ScenicSpot> pass0Selections = new ArrayList<>();
-        Set<String> landmarkPlaceIds = new HashSet<>();
+        Set<String> pass0PlaceIds = new HashSet<>();
         double pass0Remaining = totalTimeBudget;
 
-// --- Pass 0a: Best by popularity per segment (min 4.5 rating, 1000 reviews) ---
-        log.info("--- PASS 0a: Landmark anchors ---");
+// Step 1: Find best anchor candidate per segment
+        Map<Integer, ScenicSpot> anchorBySegment = new HashMap<>();
         for (int i = 0; i < numSegments; i++) {
             final int seg = i;
-            Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
+            Optional<ScenicSpot> anchorOpt = allFoundSpots.stream()
                     .filter(wp -> wp.getRating() >= 4.5)
                     .filter(wp -> wp.getUserRatingsTotal() >= 1000)
+                    .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
+                    .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
+            if (anchorOpt.isPresent()) {
+                anchorOpt.get().setSegmentIndex(seg);
+                anchorBySegment.put(seg, anchorOpt.get());
+            }
+        }
+
+// Step 2: Collect companion candidates within 10km of any anchor
+        Set<String> anchorPlaceIds = anchorBySegment.values().stream()
+                .map(ScenicSpot::getPlaceId)
+                .collect(Collectors.toSet());
+
+        List<ScenicSpot> companionPool = new ArrayList<>();
+        Set<String> companionPlaceIds = new HashSet<>();
+
+        for (ScenicSpot anchor : anchorBySegment.values()) {
+            for (ScenicSpot wp : allFoundSpots) {
+                if (wp.getRating() < 4.3) {
+                    continue;
+                }
+                if (wp.getUserRatingsTotal() < 500) {
+                    continue;
+                }
+                if (anchorPlaceIds.contains(wp.getPlaceId())) {
+                    continue;
+                }
+                if (companionPlaceIds.contains(wp.getPlaceId())) {
+                    continue;
+                }
+                if (haversineKm(anchor.getLat(), anchor.getLng(), wp.getLat(), wp.getLng()) > 10.0) {
+                    continue;
+                }
+                wp.setSegmentIndex(anchor.getSegmentIndex());
+                companionPool.add(wp);
+                companionPlaceIds.add(wp.getPlaceId());
+            }
+        }
+
+// Step 3: Build master pool — anchors + companions
+        List<ScenicSpot> masterPool = new ArrayList<>();
+        masterPool.addAll(anchorBySegment.values());
+        masterPool.addAll(companionPool);
+
+// Step 4: Score globally using rating * log(reviews)
+        for (ScenicSpot wp : masterPool) {
+            double score = wp.getRating() * Math.log(Math.max(1, wp.getUserRatingsTotal()));
+            wp.setScore(score);
+        }
+
+// Step 5: Sort by score descending
+        masterPool.sort(Comparator.comparingDouble(ScenicSpot::getScore).reversed());
+
+// Step 6: Select greedily respecting max per segment and budget
+        final int MAX_PER_SEGMENT = 3;
+        int[] segmentCount = new int[numSegments];
+
+        log.info("--- PASS 0: Global scoring selection ---");
+        for (ScenicSpot candidate : masterPool) {
+            if (pass0Remaining <= 0) {
+                break;
+            }
+            int seg = candidate.getSegmentIndex();
+            if (seg < 0 || seg >= numSegments) {
+                continue;
+            }
+            if (pass0PlaceIds.contains(candidate.getPlaceId())) {
+                continue;
+            }
+            if (segmentCount[seg] >= MAX_PER_SEGMENT) {
+                continue;
+            }
+
+            double cost = candidate.getDetour() + dwellTimePerStop;
+            if (cost > pass0Remaining) {
+                log.info("  Skipped {}: over budget (cost={}, remaining={})",
+                        candidate.getName(),
+                        String.format("%.1f", cost),
+                        String.format("%.1f", pass0Remaining));
+                continue;
+            }
+
+            pass0Selections.add(candidate);
+            pass0PlaceIds.add(candidate.getPlaceId());
+            segmentCount[seg]++;
+            pass0Remaining -= cost;
+            log.info("  Selected seg={}: {} (score={}, rating={}, reviews={}, cost={})",
+                    seg, candidate.getName(),
+                    String.format("%.1f", candidate.getScore()),
+                    candidate.getRating(),
+                    candidate.getUserRatingsTotal(),
+                    String.format("%.1f", cost));
+        }
+
+// Step 7: Fill empty segments with lower-threshold candidates
+        log.info("--- PASS 0d: Empty segment fill ---");
+        for (int i = 0; i < numSegments; i++) {
+            if (pass0Remaining <= 0) {
+                break;
+            }
+            if (segmentCount[i] > 0) {
+                continue;
+            }
+            final int seg = i;
+
+            Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
+                    .filter(wp -> wp.getRating() >= 4.5)
+                    .filter(wp -> wp.getUserRatingsTotal() >= 100)
+                    .filter(wp -> !pass0PlaceIds.contains(wp.getPlaceId()))
                     .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
                     .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
 
@@ -611,141 +727,33 @@ public class RouteBeautifierService {
                 if (cost <= pass0Remaining) {
                     best.setSegmentIndex(seg);
                     pass0Selections.add(best);
-                    landmarkPlaceIds.add(best.getPlaceId());
+                    pass0PlaceIds.add(best.getPlaceId());
+                    segmentCount[seg]++;
                     pass0Remaining -= cost;
-                    log.info("  Landmark seg={}: {} (rating={}, reviews={}, cost={})",
-                            seg, best.getName(), best.getRating(), best.getUserRatingsTotal(),
-                            String.format("%.1f", cost));
+                    log.info("  Filled seg={}: {} (rating={}, reviews={}, cost={})",
+                            seg, best.getName(), best.getRating(),
+                            best.getUserRatingsTotal(), String.format("%.1f", cost));
                 } else {
-                    log.info("  Landmark seg={}: {} skipped — over budget (cost={}, remaining={})",
+                    log.info("  seg={}: {} skipped — over budget (cost={}, remaining={})",
                             seg, best.getName(),
                             String.format("%.1f", cost),
                             String.format("%.1f", pass0Remaining));
                 }
+            } else {
+                log.info("  seg={}: no qualifying anchor found", seg);
             }
         }
 
-// --- Pass 0b: Cluster companions for each landmark ---
-        log.info(
-                "--- PASS 0b: Cluster companions ---");
-        List<ScenicSpot> pass0aSnapshot = new ArrayList<>(pass0Selections);
-
-        for (ScenicSpot landmark : pass0aSnapshot) {
-            if (pass0Remaining <= 0) {
-                break;
-            }
-
-            List<ScenicSpot> candidates = allFoundSpots.stream()
-                    .filter(wp -> wp.getRating() >= 4.3)
-                    .filter(wp -> wp.getUserRatingsTotal() >= 500)
-                    .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
-                    .filter(wp -> haversineKm(landmark.getLat(), landmark.getLng(),
-                    wp.getLat(), wp.getLng()) <= 10.0)
-                    .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
-                    .limit(MAX_CLUSTER_COMPANIONS)
-                    .collect(Collectors.toList());
-
-            for (ScenicSpot companion : candidates) {
-                if (pass0Remaining <= 0) {
-                    break;
-                }
-                double cost = companion.getDetour() + dwellTimePerStop;
-                if (cost <= pass0Remaining) {
-                    companion.setSegmentIndex(landmark.getSegmentIndex());
-                    pass0Selections.add(companion);
-                    landmarkPlaceIds.add(companion.getPlaceId());
-                    pass0Remaining -= cost;
-                    log.info("  Companion for {}: {} (rating={}, reviews={}, cost={})",
-                            landmark.getName(), companion.getName(),
-                            companion.getRating(), companion.getUserRatingsTotal(),
-                            String.format("%.1f", cost));
-                }
-            }
-        }
-
-// --- Pass 0d: Fill empty segments with best available anchor ---
-        log.info(
-                "--- PASS 0d: Empty segment fill ---");
-        for (int i = 0; i < numSegments; i++) {
-            if (pass0Remaining <= 0) {
-                break;
-            }
-            final int seg = i;
-
-            boolean segmentHasSelection = pass0Selections.stream()
-                    .anyMatch(wp -> wp.getSegmentIndex() == seg);
-
-            if (!segmentHasSelection) {
-                Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
-                        .filter(wp -> wp.getRating() >= 4.5)
-                        .filter(wp -> wp.getUserRatingsTotal() >= 100)
-                        .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
-                        .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength),
-                        numSegments - 1) == seg)
-                        .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
-
-                if (bestOpt.isPresent()) {
-                    ScenicSpot best = bestOpt.get();
-                    double cost = best.getDetour() + dwellTimePerStop;
-                    if (cost <= pass0Remaining) {
-                        best.setSegmentIndex(seg);
-                        pass0Selections.add(best);
-                        landmarkPlaceIds.add(best.getPlaceId());
-                        pass0Remaining -= cost;
-                        log.info("  Filled seg={}: {} (rating={}, reviews={}, cost={})",
-                                seg, best.getName(), best.getRating(), best.getUserRatingsTotal(),
-                                String.format("%.1f", cost));
-
-                        // Cluster companions for this anchor
-                        List<ScenicSpot> companionCandidates = allFoundSpots.stream()
-                                .filter(wp -> wp.getRating() >= 4.3)
-                                .filter(wp -> wp.getUserRatingsTotal() >= 500)
-                                .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
-                                .filter(wp -> haversineKm(best.getLat(), best.getLng(),
-                                wp.getLat(), wp.getLng()) <= 10.0)
-                                .sorted(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal).reversed())
-                                .limit(MAX_CLUSTER_COMPANIONS)
-                                .collect(Collectors.toList());
-
-                        for (ScenicSpot companion : companionCandidates) {
-                            if (pass0Remaining <= 0) {
-                                break;
-                            }
-                            double companionCost = companion.getDetour() + dwellTimePerStop;
-                            if (companionCost <= pass0Remaining) {
-                                companion.setSegmentIndex(seg);
-                                pass0Selections.add(companion);
-                                landmarkPlaceIds.add(companion.getPlaceId());
-                                pass0Remaining -= companionCost;
-                                log.info("    Pass 0d companion: {} (rating={}, reviews={})",
-                                        companion.getName(), companion.getRating(),
-                                        companion.getUserRatingsTotal());
-                            }
-                        }
-                    } else {
-                        log.info("  seg={}: {} skipped — over budget (cost={}, remaining={})",
-                                seg, best.getName(),
-                                String.format("%.1f", cost),
-                                String.format("%.1f", pass0Remaining));
-                    }
-                } else {
-                    log.info("  seg={}: no qualifying anchor found", seg);
-                }
-            }
-        }
-
-// --- Remove all Pass 0 selections from candidate pool ---
+// Step 8: Remove Pass 0 selections from candidate pool
         allFoundSpots = allFoundSpots.stream()
-                .filter(wp -> !landmarkPlaceIds.contains(wp.getPlaceId()))
+                .filter(wp -> !pass0PlaceIds.contains(wp.getPlaceId()))
                 .collect(Collectors.toList());
 
-// --- Deduct Pass 0 budget and add to final selection ---
+// Step 9: Deduct Pass 0 budget and pre-populate segmentSpent
         double pass0BudgetUsed = totalTimeBudget - pass0Remaining;
         totalTimeBudget = pass0Remaining;
-
         finalSelection.addAll(pass0Selections);
 
-// Pre-populate segmentSpent with Pass 0 costs before Pass 1
         for (ScenicSpot spot : pass0Selections) {
             int seg = spot.getSegmentIndex();
             if (seg >= 0 && seg < numSegments) {
@@ -753,8 +761,7 @@ public class RouteBeautifierService {
             }
         }
 
-        log.info(
-                "--- PASS 0 COMPLETE: {} spots selected, {} mins used, {} mins remaining ---",
+        log.info("--- PASS 0 COMPLETE: {} spots selected, {} mins used, {} mins remaining ---",
                 pass0Selections.size(),
                 String.format("%.1f", pass0BudgetUsed),
                 String.format("%.1f", totalTimeBudget));
