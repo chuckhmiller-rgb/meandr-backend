@@ -1,82 +1,89 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.meandr.meandrDataServices.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
-import jakarta.persistence.CascadeType;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-
-import org.locationtech.jts.geom.LineString;
-
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 
-/**
- *
- * @author chuck
- */
 @Entity
 @Table(name = "user_routes")
-@Getter
-@Setter
-@ToString
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class UserRoute {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(name = "user_name")
     private String userName;
 
     @Column(name = "route_name")
     private String routeName;
 
+    @Column(name = "origin_name")
+    private String originName;
+
+    @Column(name = "destination_name")
+    private String destinationName;
+
+    @Column(name = "origin_lat")
+    private Double originLat;
+
+    @Column(name = "origin_lng")
+    private Double originLng;
+
+    @Column(name = "dest_lat")
+    private Double destLat;
+
+    @Column(name = "dest_lng")
+    private Double destLng;
+
+    @Column(name = "master_polyline", columnDefinition = "MEDIUMTEXT")
+    private String masterPolyline;
+
+    @Column(name = "base_trip_mins")
+    private Integer baseTripMins;
+
+    @Column(name = "added_mins")
+    private Integer addedMins;
+
+    @Column(name = "mf")
+    private Integer mf;
+
+    @Column(name = "avoid_highways")
+    private Boolean avoidHighways = false;
+
+    @Column(name = "avoid_tolls")
+    private Boolean avoidTolls = false;
+
+    @Column(name = "exclude_origin")
+    private Boolean excludeOrigin = false;
+
+    @Column(name = "exclude_dest")
+    private Boolean excludeDest = false;
+
+    @Column(name = "is_saved")
+    private Boolean isSaved = false;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("id ASC") // Ensures JPA always gives you the list in order
+    @OrderBy("stop_order ASC")
+    @Builder.Default
     private List<RouteStop> stops = new ArrayList<>();
 
-    // --- Getters and Setters handled by lombak @getter @setter annotations ---
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getRouteName() {
-        return routeName;
-    }
-
-    public void setRouteName(String routeName) {
-        this.routeName = routeName;
-    }
-    
-    public String getUserName() {
-        return userName;
-    }
-
-    public void setUserName(String userName) {
-        this.userName = userName;
+    @PrePersist
+    public void prePersist() {
+        createdAt = LocalDateTime.now();
+        if (!Boolean.TRUE.equals(isSaved)) {
+            expiresAt = LocalDateTime.now().plusDays(30);
+        }
     }
 }

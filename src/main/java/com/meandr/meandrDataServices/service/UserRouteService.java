@@ -10,6 +10,7 @@ import com.meandr.meandrDataServices.model.UserRoute;
 import com.meandr.meandrDataServices.repository.UserRouteRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,7 +79,7 @@ public class UserRouteService {
         try {
             // 1. Fetch routes from the DB
             // The Repository will automatically JOIN the stops because of @EntityGraph
-            List<UserRoute> routes = userRouteRepository.findByuserName(userName);
+            Optional<UserRoute> routes = userRouteRepository.findByUserName(userName);
 
             // 2. Map the list of Entities to a list of DTOs
             return routes.stream()

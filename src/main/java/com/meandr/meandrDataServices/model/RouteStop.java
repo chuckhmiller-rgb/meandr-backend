@@ -1,25 +1,9 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.meandr.meandrDataServices.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
 
-/**
- *
- * @author chuck
- */
 @Entity
 @Table(name = "route_stops")
 @Data
@@ -30,58 +14,38 @@ public class RouteStop {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "stop_order")
+    private Integer stopOrder;
+
+    @Column(name = "place_id")
     private String placeId;
+
+    @Column(name = "place_name")
     private String placeName;
+
+    @Column(name = "place_address")
     private String placeAddress;
+
+    @Column(name = "place_lat")
     private Float placeLat;
+
+    @Column(name = "place_lon")
     private Float placeLon;
+
+    @Column(name = "entity_type")
+    private String entityType;
+
+    @Column(name = "detour_mins")
+    private Integer detourMins;
+
+    @Column(name = "rating")
+    private Double rating;
+
+    @Column(name = "reviews_total")
+    private Integer reviewsTotal;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
+    @JsonIgnore
     private UserRoute route;
-    
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long ID) {
-        this.id = ID;
-    }
-    
-    public String getPlaceId() {
-        return placeId;
-    }
-    
-    public void setPlaceId(String placeID) {
-        this.placeId = placeID;
-    }
-
-    public String getPlaceName() {
-        return placeName;
-    }
-
-    public void setPlaceName(String placeNAME) {
-        this.placeName = placeNAME;
-    }
-    
-    public Float getPlaceLat() {
-        return placeLat;
-    }
-    
-    public void setPlaceLat(Float placeLAT) {
-        this.placeLat = placeLAT;
-    }
-    
-    public Float getPlaceLon() {
-        return placeLon;
-    }
-    
-    public void setPlaceLon(Float placeLON) {
-        this.placeLon = placeLON;
-    }
-
-    
-    
-    
-    
 }

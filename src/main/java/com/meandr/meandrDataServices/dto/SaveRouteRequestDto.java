@@ -1,0 +1,41 @@
+package com.meandr.meandrDataServices.dto;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.List;
+
+@Data
+@NoArgsConstructor
+public class SaveRouteRequestDto {
+    private String userName;
+    private String routeName;
+    private String originName;
+    private String destinationName;
+    private Double originLat;
+    private Double originLng;
+    private Double destLat;
+    private Double destLng;
+    private String masterPolyline;
+    private Integer baseTripMins;
+    private Integer addedMins;
+    private Integer mf;
+    private Boolean avoidHighways;
+    private Boolean avoidTolls;
+    private Boolean excludeOrigin;
+    private Boolean excludeDest;
+    private List<StopDto> stops;
+
+    @Data
+    @NoArgsConstructor
+    public static class StopDto {
+        private String placeId;
+        private String placeName;
+        private String placeAddress;
+        private Float placeLat;
+        private Float placeLon;
+        private String entityType;
+        private Integer detourMins;
+        private Double rating;
+        private Integer reviewsTotal;
+    }
+}

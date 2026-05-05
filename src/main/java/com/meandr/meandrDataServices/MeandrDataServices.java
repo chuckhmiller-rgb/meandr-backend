@@ -7,6 +7,7 @@ package com.meandr.meandrDataServices;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.ServletComponentScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  *
@@ -14,6 +15,7 @@ import org.springframework.boot.web.servlet.ServletComponentScan;
  */
 @SpringBootApplication
 @ServletComponentScan
+@EnableScheduling
 public class MeandrDataServices {
     public static void main(String[] args) {
         SpringApplication.run(MeandrDataServices.class, args);

@@ -22,6 +22,7 @@ com/meandr/meandrDataServices/HelloServlet.class
 com/meandr/meandrDataServices/dto/ParkResponseDto$ParkResponseDtoBuilder.class
 com/meandr/meandrDataServices/mapper/UsersFieldUpdateMapper.class
 com/meandr/meandrDataServices/dto/UsersUpdateDto.class
+com/meandr/meandrDataServices/scheduler/RouteCleanupScheduler.class
 com/meandr/meandrDataServices/dto/UserRouteDto$UserRouteDtoBuilder.class
 com/meandr/meandrDataServices/osm/service/OsmService.class
 com/meandr/meandrDataServices/model/ClimbingGym.class
@@ -40,6 +41,7 @@ com/meandr/meandrDataServices/dto/PlaceSearchRequestDto.class
 com/meandr/meandrDataServices/util/PolylineUtils.class
 com/meandr/meandrDataServices/service/MapBoxRoutingService.class
 com/meandr/meandrDataServices/model/ScenicSpot.class
+com/meandr/meandrDataServices/dto/SaveRouteRequestDto.class
 com/meandr/meandrDataServices/service/RouteBeautifierService.class
 com/meandr/meandrDataServices/dto/UsersRegistrationDto$UsersRegistrationDtoBuilder.class
 com/meandr/meandrDataServices/util/GooglePlacesTypeMapper.class
@@ -94,4 +96,5 @@ com/meandr/meandrDataServices/model/UserRoute$UserRouteBuilder.class
 com/meandr/meandrDataServices/dto/ClimbingGymResponseDto.class
 com/meandr/meandrDataServices/dto/RouteStepSummaryDto.class
 com/meandr/meandrDataServices/repository/UsersRepository.class
+com/meandr/meandrDataServices/dto/SaveRouteRequestDto$StopDto.class
 com/meandr/meandrDataServices/osm/model/OsmPlace.class

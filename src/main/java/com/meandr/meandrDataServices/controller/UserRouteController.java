@@ -1,76 +1,118 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.meandr.meandrDataServices.controller;
 
-import com.meandr.meandrDataServices.dto.UserRouteDto;
-import com.meandr.meandrDataServices.service.UserRouteService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-/**
- *
- * @author chuck
- */
+import com.meandr.meandrDataServices.dto.SaveRouteRequestDto;
+import com.meandr.meandrDataServices.model.RouteStop;
+import com.meandr.meandrDataServices.model.UserRoute;
+import com.meandr.meandrDataServices.repository.UserRouteRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.IntStream;
 
-@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @RestController
-@RequestMapping("/api/v1/routes")
+@RequestMapping("/api/v1/user-routes")
 @RequiredArgsConstructor
+@Slf4j
+@CrossOrigin(origins = "https://meandr-app.vercel.app")
 public class UserRouteController {
 
-    private final UserRouteService userRouteService;
+    private final UserRouteRepository userRouteRepository;
 
-    // Create a new route
-    @PostMapping("/createRoute")
-    public ResponseEntity<UserRouteDto> createRoute(@RequestBody UserRouteDto routeDto) {
-        UserRouteDto savedRoute = userRouteService.saveRoute(routeDto);
-        return new ResponseEntity<>(savedRoute, HttpStatus.CREATED);
+    // Save a new route (temporary by default)
+    @PostMapping
+    public ResponseEntity<UserRoute> saveRoute(@RequestBody SaveRouteRequestDto request) {
+        UserRoute route = UserRoute.builder()
+            .userName(request.getUserName())
+            .routeName(request.getRouteName() != null ? request.getRouteName() 
+                : request.getOriginName() + " → " + request.getDestinationName())
+            .originName(request.getOriginName())
+            .destinationName(request.getDestinationName())
+            .originLat(request.getOriginLat())
+            .originLng(request.getOriginLng())
+            .destLat(request.getDestLat())
+            .destLng(request.getDestLng())
+            .masterPolyline(request.getMasterPolyline())
+            .baseTripMins(request.getBaseTripMins())
+            .addedMins(request.getAddedMins())
+            .mf(request.getMf())
+            .avoidHighways(request.getAvoidHighways())
+            .avoidTolls(request.getAvoidTolls())
+            .excludeOrigin(request.getExcludeOrigin())
+            .excludeDest(request.getExcludeDest())
+            .isSaved(false)
+            .build();
+
+        // Add stops
+        if (request.getStops() != null) {
+            List<RouteStop> stops = IntStream.range(0, request.getStops().size())
+                .mapToObj(i -> {
+                    SaveRouteRequestDto.StopDto s = request.getStops().get(i);
+                    RouteStop stop = new RouteStop();
+                    stop.setStopOrder(i);
+                    stop.setPlaceId(s.getPlaceId());
+                    stop.setPlaceName(s.getPlaceName());
+                    stop.setPlaceAddress(s.getPlaceAddress());
+                    stop.setPlaceLat(s.getPlaceLat());
+                    stop.setPlaceLon(s.getPlaceLon());
+                    stop.setEntityType(s.getEntityType());
+                    stop.setDetourMins(s.getDetourMins());
+                    stop.setRating(s.getRating());
+                    stop.setReviewsTotal(s.getReviewsTotal());
+                    stop.setRoute(route);
+                    return stop;
+                })
+                .toList();
+            route.setStops(stops);
+        }
+
+        UserRoute saved = userRouteRepository.save(route);
+        log.info("Saved route {} for user {}", saved.getId(), saved.getUserName());
+        return ResponseEntity.ok(saved);
     }
-    
-    @PostMapping("/beautifyRoute")
-    public ResponseEntity<UserRouteDto> beautifyRoute(@RequestBody UserRouteDto routeDto) {
-        UserRouteDto savedRoute = userRouteService.saveRoute(routeDto);
-        return new ResponseEntity<>(savedRoute, HttpStatus.CREATED);
+
+    // Get all routes for a user (recent + saved)
+    @GetMapping("/{userName}")
+    public ResponseEntity<List<UserRoute>> getRoutes(@PathVariable String userName) {
+        return ResponseEntity.ok(userRouteRepository.findByUserNameOrderByCreatedAtDesc(userName));
     }
 
-    @PostMapping("/addRouteStop")
-    public ResponseEntity<UserRouteDto> addStop(
-            @RequestParam String userName,
-            @RequestParam String routeName,
-            @RequestBody UserRouteDto.RouteStopDto newStop) {
-
-        return ResponseEntity.ok(userRouteService.addStopToRoute(userName, routeName, newStop));
+    // Get only saved routes
+    @GetMapping("/{userName}/saved")
+    public ResponseEntity<List<UserRoute>> getSavedRoutes(@PathVariable String userName) {
+        return ResponseEntity.ok(userRouteRepository.findByUserNameAndIsSavedTrueOrderByCreatedAtDesc(userName));
     }
 
-    // Get all routes for a specific user
-    @GetMapping("/search/getAllRoutes")
-    public ResponseEntity<List<UserRouteDto>> getAllUserRoutes(@RequestParam String userName) {
-        List<UserRouteDto> routes = userRouteService.getAllUserRoutes(userName);
-        return ResponseEntity.ok(routes);
+    // Promote a route to saved (permanent)
+    @PatchMapping("/{id}/save")
+    public ResponseEntity<UserRoute> promoteToSaved(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Optional<UserRoute> opt = userRouteRepository.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        UserRoute route = opt.get();
+        route.setIsSaved(true);
+        route.setExpiresAt(null);
+        if (body.containsKey("routeName")) route.setRouteName(body.get("routeName"));
+        return ResponseEntity.ok(userRouteRepository.save(route));
     }
 
-    @GetMapping("/search/getRoute")
-    public ResponseEntity<UserRouteDto> getRoute(
-            @RequestParam Long id) {
-        return ResponseEntity.ok(userRouteService.getRouteById(id));
+    // Delete a route
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteRoute(@PathVariable Long id) {
+        userRouteRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/search/getRouteDetails")
-    public ResponseEntity<UserRouteDto> getRouteDetails(
-            @RequestParam String userName,
-            @RequestParam String routeName) {
-
-        UserRouteDto route = userRouteService.getRouteByNames(userName, routeName);
-        return ResponseEntity.ok(route);
+    // Cleanup expired routes (call periodically)
+    @DeleteMapping("/cleanup")
+    public ResponseEntity<Void> cleanup() {
+        userRouteRepository.deleteExpiredRoutes(LocalDateTime.now());
+        return ResponseEntity.noContent().build();
     }
 }
