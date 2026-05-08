@@ -13,6 +13,7 @@ import java.util.ArrayList;
 @AllArgsConstructor
 @Builder
 public class UserRoute {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -64,6 +65,9 @@ public class UserRoute {
 
     @Column(name = "exclude_dest")
     private Boolean excludeDest = false;
+
+    @Column(name = "entity_preferences", columnDefinition = "TEXT")
+    private String entityPreferences;
 
     @Column(name = "is_saved")
     private Boolean isSaved = false;

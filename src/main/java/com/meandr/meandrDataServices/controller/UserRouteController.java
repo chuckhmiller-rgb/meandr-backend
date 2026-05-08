@@ -1,5 +1,7 @@
 package com.meandr.meandrDataServices.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meandr.meandrDataServices.dto.SaveRouteRequestDto;
 import com.meandr.meandrDataServices.model.RouteStop;
 import com.meandr.meandrDataServices.model.UserRoute;
@@ -26,48 +28,51 @@ public class UserRouteController {
 
     // Save a new route (temporary by default)
     @PostMapping
-    public ResponseEntity<UserRoute> saveRoute(@RequestBody SaveRouteRequestDto request) {
+    public ResponseEntity<UserRoute> saveRoute(@RequestBody SaveRouteRequestDto request) throws JsonProcessingException {
         UserRoute route = UserRoute.builder()
-            .userName(request.getUserName())
-            .routeName(request.getRouteName() != null ? request.getRouteName() 
-                : request.getOriginName() + " → " + request.getDestinationName())
-            .originName(request.getOriginName())
-            .destinationName(request.getDestinationName())
-            .originLat(request.getOriginLat())
-            .originLng(request.getOriginLng())
-            .destLat(request.getDestLat())
-            .destLng(request.getDestLng())
-            .masterPolyline(request.getMasterPolyline())
-            .baseTripMins(request.getBaseTripMins())
-            .addedMins(request.getAddedMins())
-            .mf(request.getMf())
-            .avoidHighways(request.getAvoidHighways())
-            .avoidTolls(request.getAvoidTolls())
-            .excludeOrigin(request.getExcludeOrigin())
-            .excludeDest(request.getExcludeDest())
-            .isSaved(false)
-            .build();
+                .userName(request.getUserName())
+                .routeName(request.getRouteName() != null ? request.getRouteName()
+                        : request.getOriginName() + " → " + request.getDestinationName())
+                .originName(request.getOriginName())
+                .destinationName(request.getDestinationName())
+                .originLat(request.getOriginLat())
+                .originLng(request.getOriginLng())
+                .destLat(request.getDestLat())
+                .destLng(request.getDestLng())
+                .masterPolyline(request.getMasterPolyline())
+                .baseTripMins(request.getBaseTripMins())
+                .addedMins(request.getAddedMins())
+                .mf(request.getMf())
+                .avoidHighways(request.getAvoidHighways())
+                .avoidTolls(request.getAvoidTolls())
+                .excludeOrigin(request.getExcludeOrigin())
+                .excludeDest(request.getExcludeDest())
+                .entityPreferences(request.getEntityPreferences() != null
+                        ? new ObjectMapper().writeValueAsString(request.getEntityPreferences())
+                        : null)
+                .isSaved(false)
+                .build();
 
         // Add stops
         if (request.getStops() != null) {
             List<RouteStop> stops = IntStream.range(0, request.getStops().size())
-                .mapToObj(i -> {
-                    SaveRouteRequestDto.StopDto s = request.getStops().get(i);
-                    RouteStop stop = new RouteStop();
-                    stop.setStopOrder(i);
-                    stop.setPlaceId(s.getPlaceId());
-                    stop.setPlaceName(s.getPlaceName());
-                    stop.setPlaceAddress(s.getPlaceAddress());
-                    stop.setPlaceLat(s.getPlaceLat());
-                    stop.setPlaceLon(s.getPlaceLon());
-                    stop.setEntityType(s.getEntityType());
-                    stop.setDetourMins(s.getDetourMins());
-                    stop.setRating(s.getRating());
-                    stop.setReviewsTotal(s.getReviewsTotal());
-                    stop.setRoute(route);
-                    return stop;
-                })
-                .toList();
+                    .mapToObj(i -> {
+                        SaveRouteRequestDto.StopDto s = request.getStops().get(i);
+                        RouteStop stop = new RouteStop();
+                        stop.setStopOrder(i);
+                        stop.setPlaceId(s.getPlaceId());
+                        stop.setPlaceName(s.getPlaceName());
+                        stop.setPlaceAddress(s.getPlaceAddress());
+                        stop.setPlaceLat(s.getPlaceLat());
+                        stop.setPlaceLon(s.getPlaceLon());
+                        stop.setEntityType(s.getEntityType());
+                        stop.setDetourMins(s.getDetourMins());
+                        stop.setRating(s.getRating());
+                        stop.setReviewsTotal(s.getReviewsTotal());
+                        stop.setRoute(route);
+                        return stop;
+                    })
+                    .toList();
             route.setStops(stops);
         }
 
@@ -94,11 +99,15 @@ public class UserRouteController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         Optional<UserRoute> opt = userRouteRepository.findById(id);
-        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
         UserRoute route = opt.get();
         route.setIsSaved(true);
         route.setExpiresAt(null);
-        if (body.containsKey("routeName")) route.setRouteName(body.get("routeName"));
+        if (body.containsKey("routeName")) {
+            route.setRouteName(body.get("routeName"));
+        }
         return ResponseEntity.ok(userRouteRepository.save(route));
     }
 
