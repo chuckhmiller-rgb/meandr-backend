@@ -6,7 +6,6 @@ package com.meandr.meandrDataServices.controller;
 
 //import static com.fasterxml.jackson.databind.jsonFormatVisitors.JsonValueFormat.URI;
 import com.meandr.meandrDataServices.dto.UsersRegistrationDto;
-import com.meandr.meandrDataServices.dto.UsersResponseDto;
 import com.meandr.meandrDataServices.dto.UsersUpdateDto;
 import com.meandr.meandrDataServices.model.Users;
 import com.meandr.meandrDataServices.preferences.PreferenceTier;

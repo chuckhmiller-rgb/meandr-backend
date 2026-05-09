@@ -3,6 +3,7 @@ package com.meandr.meandrDataServices.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meandr.meandrDataServices.dto.SaveRouteRequestDto;
+import com.meandr.meandrDataServices.dto.UserRouteSummaryDto;
 import com.meandr.meandrDataServices.model.RouteStop;
 import com.meandr.meandrDataServices.model.UserRoute;
 import com.meandr.meandrDataServices.repository.UserRouteRepository;
@@ -15,13 +16,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @RestController
 @RequestMapping("/api/v1/user-routes")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "https://meandr-app.vercel.app")
+//@CrossOrigin(origins = "https://meandr-app.vercel.app")
 public class UserRouteController {
 
     private final UserRouteRepository userRouteRepository;
@@ -81,6 +83,25 @@ public class UserRouteController {
         return ResponseEntity.ok(saved);
     }
 
+    @GetMapping("/{userName}/summary")
+    public ResponseEntity<List<UserRouteSummaryDto>> getRouteSummaries(@PathVariable String userName) {
+        List<UserRoute> routes = userRouteRepository.findByUserNameOrderByCreatedAtDesc(userName);
+        List<UserRouteSummaryDto> summaries = routes.stream().map(r -> UserRouteSummaryDto.builder()
+                .id(r.getId())
+                .routeName(r.getRouteName())
+                .originName(r.getOriginName())
+                .destinationName(r.getDestinationName())
+                .baseTripMins(r.getBaseTripMins())
+                .addedMins(r.getAddedMins())
+                .isSaved(r.getIsSaved())
+                .createdAt(r.getCreatedAt())
+                .expiresAt(r.getExpiresAt())
+                .stopCount(r.getStops() != null ? r.getStops().size() : 0)
+                .build())
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(summaries);
+    }
+
     // Get all routes for a user (recent + saved)
     @GetMapping("/{userName}")
     public ResponseEntity<List<UserRoute>> getRoutes(@PathVariable String userName) {
@@ -91,6 +112,13 @@ public class UserRouteController {
     @GetMapping("/{userName}/saved")
     public ResponseEntity<List<UserRoute>> getSavedRoutes(@PathVariable String userName) {
         return ResponseEntity.ok(userRouteRepository.findByUserNameAndIsSavedTrueOrderByCreatedAtDesc(userName));
+    }
+
+    @GetMapping("/route/{id}")
+    public ResponseEntity<UserRoute> getRoute(@PathVariable Long id) {
+        return userRouteRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // Promote a route to saved (permanent)

@@ -48,6 +48,7 @@ com/meandr/meandrDataServices/util/GooglePlacesTypeMapper.class
 com/meandr/meandrDataServices/model/Park.class
 com/meandr/meandrDataServices/dto/TripSummary.class
 com/meandr/meandrDataServices/service/ScenicRankerService.class
+com/meandr/meandrDataServices/dto/UserRouteSummaryDto$UserRouteSummaryDtoBuilder.class
 com/meandr/meandrDataServices/controller/ParkController.class
 com/meandr/meandrDataServices/dto/UserRouteDto$RouteStopDto$RouteStopDtoBuilder.class
 com/meandr/meandrDataServices/dto/RerouteRequestDto$WaypointDto.class
@@ -73,6 +74,7 @@ com/meandr/meandrDataServices/config/CorsConfig.class
 com/meandr/meandrDataServices/controller/AuthController.class
 com/meandr/meandrDataServices/security/JwtFilter.class
 com/meandr/meandrDataServices/dto/ClimbingGymResponseDto$ClimbingGymResponseDtoBuilder.class
+com/meandr/meandrDataServices/dto/UserRouteSummaryDto.class
 com/meandr/meandrDataServices/repository/UserRouteRepository.class
 com/meandr/meandrDataServices/dto/RouteStepDetailDto.class
 com/meandr/meandrDataServices/ServletInitializer.class

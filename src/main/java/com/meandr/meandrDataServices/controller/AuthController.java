@@ -12,7 +12,7 @@ import java.util.Map;
 import java.lang.ArithmeticException;
 
 
-@CrossOrigin(origins = "https://meandr-app.vercel.app")
+//@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor

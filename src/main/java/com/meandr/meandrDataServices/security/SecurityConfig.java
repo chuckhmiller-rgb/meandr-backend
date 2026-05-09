@@ -76,7 +76,7 @@ public class SecurityConfig {
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         //config.setAllowedHeaders(List.of("*"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "ngrok-skip-browser-warning"));
         config.setAllowCredentials(true);     // keep if you're sending cookies / Authorization header with JWT
         config.setMaxAge(3600L);
 
