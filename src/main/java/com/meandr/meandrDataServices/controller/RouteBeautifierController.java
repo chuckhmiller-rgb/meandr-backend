@@ -102,6 +102,8 @@ public class RouteBeautifierController {
         response.setEntityPreferences(request.getEntityPreferences());
         response.setDwellTimePerStop(request.getDwellTimePerStop());
         response.setRouteEnhancementThreshold(request.getRouteEnhancementThreshold());
+        
+        log.debug("response is: " + response.toString());
 
         return ResponseEntity.ok(response);
     }
@@ -117,9 +119,11 @@ public class RouteBeautifierController {
                         s.setLat(w.getLat());
                         s.setLng(w.getLng());
                         s.setPlaceId(w.getPlaceId());
-                        s.setScore(100.0); // default score so self-healing works
+                        s.setScore(100.0);
                         return s;
-                    }).collect(Collectors.toList())
+                    }).collect(Collectors.toList()),
+                    request.isAvoidHighways(),
+                    request.isAvoidTolls()
             );
             return ResponseEntity.ok(result);
         } catch (Exception e) {

@@ -232,13 +232,15 @@ public class RouteBeautifierService {
         log.info("Decoded route into {} coordinate points", routeCoords.size());
 
         return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
-                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline);
+                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls);
     }
 
     public Map<String, Object> routeWithWaypoints(
             CoordinateDto origin,
             CoordinateDto dest,
-            List<ScenicSpot> waypoints) throws Exception {
+            List<ScenicSpot> waypoints,
+            boolean avoidHighways,
+            boolean avoidTolls) throws Exception {
 
         com.google.maps.model.LatLng googleOrigin
                 = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
@@ -252,6 +254,17 @@ public class RouteBeautifierService {
                     .origin(googleOrigin)
                     .destination(googleDest)
                     .mode(TravelMode.DRIVING);
+
+            List<DirectionsApi.RouteRestriction> restrictions = new ArrayList<>();
+            if (avoidHighways) {
+                restrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
+            }
+            if (avoidTolls) {
+                restrictions.add(DirectionsApi.RouteRestriction.TOLLS);
+            }
+            if (!restrictions.isEmpty()) {
+                request.avoid(restrictions.toArray(new DirectionsApi.RouteRestriction[0]));
+            }
 
             String[] waypointStrings = mutableWaypoints.stream()
                     .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
@@ -320,6 +333,10 @@ public class RouteBeautifierService {
      * @param entityPreferences
      * @param dwellTimePerStop
      * @param encodedPolyline
+     * @param excludeOrigin
+     * @param excludeDest
+     * @param avoidHighways
+     * @param avoidTolls
      * @return
      */
     public BeautifiedRouteResponseDto beautifyRoute(
@@ -331,7 +348,9 @@ public class RouteBeautifierService {
             boolean excludeOrigin,
             boolean excludeDest,
             int dwellTimePerStop,
-            String encodedPolyline
+            String encodedPolyline,
+            boolean avoidHighways,
+            boolean avoidTolls
     ) {
         List<LatLng> path = routeCoords.stream()
                 .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
@@ -372,7 +391,7 @@ public class RouteBeautifierService {
         // Attempt routing with self-healing, fall back to polyline-only on failure
         RoutingResultWithWaypoints routing;
         try {
-            routing = fetchBeautifiedPathDetails(originPoint, destinationPoint, topCandidates);
+            routing = fetchBeautifiedPathDetails(originPoint, destinationPoint, topCandidates, avoidHighways, avoidTolls);
             log.info("Routed with {} waypoints ({} removed during self-healing)",
                     routing.getActualWaypoints().size(),
                     topCandidates.size() - routing.getActualWaypoints().size());
@@ -394,7 +413,6 @@ public class RouteBeautifierService {
             }
         }
 
-        
         List<ScenicSpot> rejectedWaypoints = candidates.stream()
                 .filter(spot -> !routedIds.contains(spot.getPlaceId()))
                 .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
@@ -452,7 +470,9 @@ public class RouteBeautifierService {
     private RoutingResultWithWaypoints fetchBeautifiedPathDetails(
             LatLng origin,
             LatLng dest,
-            List<ScenicSpot> waypoints
+            List<ScenicSpot> waypoints,
+            boolean avoidHighways,
+            boolean avoidTolls
     ) throws Exception {
 
         waypoints.forEach(s -> log.info("Waypoint: {} placeId={}", s.getName(), s.getPlaceId()));
@@ -467,6 +487,17 @@ public class RouteBeautifierService {
                     .origin(googleOrigin)
                     .destination(googleDest)
                     .mode(TravelMode.DRIVING);
+
+            List<DirectionsApi.RouteRestriction> restrictions = new ArrayList<>();
+            if (avoidHighways) {
+                restrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
+            }
+            if (avoidTolls) {
+                restrictions.add(DirectionsApi.RouteRestriction.TOLLS);
+            }
+            if (!restrictions.isEmpty()) {
+                request.avoid(restrictions.toArray(new DirectionsApi.RouteRestriction[0]));
+            }
 
             String[] waypointStrings = waypoints.stream()
                     .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
@@ -499,11 +530,23 @@ public class RouteBeautifierService {
 
         // Last attempt: direct route with no waypoints
         try {
-            DirectionsResult result = DirectionsApi.newRequest(context)
+            List<DirectionsApi.RouteRestriction> fallbackRestrictions = new ArrayList<>();
+            if (avoidHighways) {
+                fallbackRestrictions.add(DirectionsApi.RouteRestriction.HIGHWAYS);
+            }
+            if (avoidTolls) {
+                fallbackRestrictions.add(DirectionsApi.RouteRestriction.TOLLS);
+            }
+
+            DirectionsApiRequest fallbackRequest = DirectionsApi.newRequest(context)
                     .origin(googleOrigin)
                     .destination(googleDest)
-                    .mode(TravelMode.DRIVING)
-                    .await();
+                    .mode(TravelMode.DRIVING);
+            if (!fallbackRestrictions.isEmpty()) {
+                fallbackRequest.avoid(fallbackRestrictions.toArray(new DirectionsApi.RouteRestriction[0]));
+            }
+
+            DirectionsResult result = fallbackRequest.await();
             if (result.routes.length > 0) {
                 log.warn("Fell back to direct route — all waypoints rejected");
                 return new RoutingResultWithWaypoints(
@@ -516,7 +559,6 @@ public class RouteBeautifierService {
         } catch (Exception ex) {
             log.error("Direct route fallback also failed: {}", ex.getMessage());
         }
-
         log.error("Could not generate route even after removing all waypoints");
         return new RoutingResultWithWaypoints("", "", new ArrayList<>(), new ArrayList<>());
     }
