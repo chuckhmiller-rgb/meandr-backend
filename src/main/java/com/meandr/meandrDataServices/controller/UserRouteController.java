@@ -52,6 +52,9 @@ public class UserRouteController {
                 .entityPreferences(request.getEntityPreferences() != null
                         ? new ObjectMapper().writeValueAsString(request.getEntityPreferences())
                         : null)
+                .rejectedStops(request.getRejectedStops() != null
+                        ? new ObjectMapper().writeValueAsString(request.getRejectedStops())
+                        : null)
                 .isSaved(false)
                 .build();
 

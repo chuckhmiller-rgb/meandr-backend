@@ -78,6 +78,9 @@ public class UserRoute {
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
+    @Column(name = "rejected_stops", columnDefinition = "JSON")
+    private String rejectedStops;
+
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stop_order ASC")
     @Builder.Default

@@ -25,6 +25,7 @@ public class SaveRouteRequestDto {
     private Boolean excludeDest;
     private List<String> entityPreferences;
     private List<StopDto> stops;
+    private List<StopDto> rejectedStops;
 
     @Data
     @NoArgsConstructor
