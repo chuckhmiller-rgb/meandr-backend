@@ -82,6 +82,7 @@ com/meandr/meandrDataServices/preferences/EntityCategory.class
 com/meandr/meandrDataServices/model/Park$ParkBuilder.class
 com/meandr/meandrDataServices/service/MapBoxRoutingService$MapBoxRoute.class
 com/meandr/meandrDataServices/controller/VisualizerController.class
+com/meandr/meandrDataServices/dto/UpdateRouteRequestDto$StopDto.class
 com/meandr/meandrDataServices/preferences/EntitySource.class
 com/meandr/meandrDataServices/scoring/ScoredWaypoint$Source.class
 com/meandr/meandrDataServices/dto/UserRouteDto.class
@@ -96,6 +97,7 @@ com/meandr/meandrDataServices/mapper/UsersModelMapper.class
 com/meandr/meandrDataServices/osm/model/OsmSearchRequest.class
 com/meandr/meandrDataServices/model/UserRoute$UserRouteBuilder.class
 com/meandr/meandrDataServices/dto/ClimbingGymResponseDto.class
+com/meandr/meandrDataServices/dto/UpdateRouteRequestDto.class
 com/meandr/meandrDataServices/dto/RouteStepSummaryDto.class
 com/meandr/meandrDataServices/repository/UsersRepository.class
 com/meandr/meandrDataServices/dto/SaveRouteRequestDto$StopDto.class

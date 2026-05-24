@@ -29,6 +29,9 @@ public class Users {
 
     @Column(name = "navigation_app", length = 20)
     private String navigationApp;
+    
+    @Column(name = "navigation_voice", length = 100)
+    private String navigationVoice;
 
     @Column(name = "username", length = 50, nullable = false, unique = true)
     private String username;

@@ -27,6 +27,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/RouteStepSummaryDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/SaveRouteRequestDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/TripSummary.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UpdateRouteRequestDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UserRouteDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UserRouteSummaryDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UsersRegistrationDto.java

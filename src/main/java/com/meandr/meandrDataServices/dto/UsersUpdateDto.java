@@ -21,5 +21,6 @@ public class UsersUpdateDto {
     private String countryCode;
     private String bio;
     private String avatarUrl;
+    private String navigation_voice;
 
 }

@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 public class UsersResponseDto{
         //Long id;
         String navigationApp;
+        String navigationVoice;
         String username;
         String email;
         String firstName;
@@ -40,6 +41,7 @@ public class UsersResponseDto{
         return new UsersResponseDto(
                 //user.getApplication_user_id(),
                 user.getNavigationApp(),
+                user.getNavigationVoice(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getFirstName(),
