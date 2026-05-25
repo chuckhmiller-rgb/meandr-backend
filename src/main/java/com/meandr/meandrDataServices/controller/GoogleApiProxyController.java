@@ -77,6 +77,26 @@ public class GoogleApiProxyController {
             "lodging", "gas_station", "park"
     );
 
+    public static final Map<String, String> ENTITY_KEYWORDS = Map.ofEntries(
+            Map.entry("WATERFALL", "waterfall falls cascade"),
+            Map.entry("CLIMBING_CRAG", "climbing crag route"),
+            Map.entry("BOULDER", "bouldering boulder climbing route"),
+            Map.entry("HOT_SPRING", "hotspring thermal spring"),
+            Map.entry("BIRD_HIDE", "bird hide birding wildlife blind"),
+            Map.entry("SWIMMING_HOLE", "swimming hole swimming creek"),
+            Map.entry("CAVE", "cave cavern grotto"),
+            Map.entry("DARK_SKY_AREA", "dark sky stargazing darksky"),
+            Map.entry("SCENIC_OVERLOOK", "overlook scenic viewpoint vista"),
+            Map.entry("PEAK", "mountain peak summit"),
+            Map.entry("RIVER_ACCESS", "river access boat launch canoe kayak"),
+            Map.entry("GHOST_TOWN", "ghost town abandoned historic ruins"),
+            Map.entry("ARCHAEOLOGICAL_SITE", "archaeological site ruins excavation"),
+            Map.entry("TRAILHEAD", "trailhead trail access hiking"),
+            Map.entry("STATE_PARK", "state park"),
+            Map.entry("DOG_PARK", "dog park off leash"),
+            Map.entry("OBSERVATORY", "observatory telescope stargazing")
+    );
+
     @Autowired
     private PlacesCacheService placesCacheService;
 
@@ -217,6 +237,65 @@ public class GoogleApiProxyController {
         }
     }
 
+    public List<ScenicSpot> searchTextScenic(double lat, double lng, int radius, String keyword, List<String> googleTypes) { // --- Tier 1: MySQL persistent cache ---
+    
+        // --- Tier 1: MySQL persistent cache ---
+        List<ScenicSpot> cached = placesCacheService.findNearby(lat, lng, radius, googleTypes);
+        if (!cached.isEmpty()) {
+            log.info("MySQL cache hit (keyword): {} spots near ({},{})", cached.size(), lat, lng);
+            return cached;
+        }
+        log.info("MySQL cache miss — calling Google Places searchText near ({},{}) keyword={}", lat, lng, keyword);
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("textQuery", keyword);
+        requestBody.put("maxResultCount", 20);
+        if (googleTypes != null && !googleTypes.isEmpty()) {
+            requestBody.put("includedType", googleTypes.get(0)); // searchText only allows one type
+        }
+        requestBody.put("locationBias", Map.of(
+                "circle", Map.of(
+                        "center", Map.of("latitude", lat, "longitude", lng),
+                        "radius", (double) radius
+                )
+        ));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Goog-Api-Key", apiKey);
+        headers.set("X-Goog-FieldMask",
+                "places.id,places.displayName,places.formattedAddress,places.types,"
+                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours");
+
+        try {
+            JsonNode response = restTemplate.postForObject(
+                    "https://places.googleapis.com/v1/places:searchText",
+                    new HttpEntity<>(requestBody, headers),
+                    JsonNode.class
+            );
+            if (response == null || !response.has("places")) {
+                return Collections.emptyList();
+            }
+            List<ScenicSpot> spots = new ArrayList<>();
+            for (JsonNode node : response.get("places")) {
+                ScenicSpot spot = mapToScenicSpot(node);
+                if (spot != null) {
+                    spot.setName("(keyword) " + spot.getName());
+                    spots.add(spot);
+                }
+            }
+
+            // --- Backfill MySQL cache ---
+            if (!spots.isEmpty()) {
+                placesCacheService.saveAll(spots);
+                log.info("Backfilled {} keyword spots to MySQL cache", spots.size());
+            }
+            return spots;
+        } catch (Exception e) {
+            log.error("Google searchText error near ({},{}): {}", lat, lng, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
     @Operation(summary = "searchNearby for places")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = @Content(
@@ -258,7 +337,7 @@ public class GoogleApiProxyController {
         headers.set("X-Goog-Api-Key", apiKey);
         // The FieldMask is REQUIRED. This defines what data you get back.
         headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount");
-        
+
         requestBody.put("rankPreference", "POPULARITY");
 
         // 3. Prepare the Request Entity (Body + Headers)
