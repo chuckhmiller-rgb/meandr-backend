@@ -4,6 +4,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/ServletInitializer.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/CacheConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/CorsConfig.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/DebugConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/GoogleMapsConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/JacksonConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/OpenApiConfig.java

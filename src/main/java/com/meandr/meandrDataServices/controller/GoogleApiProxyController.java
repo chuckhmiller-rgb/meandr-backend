@@ -279,7 +279,7 @@ public class GoogleApiProxyController {
             for (JsonNode node : response.get("places")) {
                 ScenicSpot spot = mapToScenicSpot(node);
                 if (spot != null) {
-                    spot.setName("(keyword) " + spot.getName());
+                    spot.setName(spot.getName());
                     spots.add(spot);
                 }
             }

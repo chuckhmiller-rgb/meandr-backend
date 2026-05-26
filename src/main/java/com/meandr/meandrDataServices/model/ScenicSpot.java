@@ -29,8 +29,23 @@ public class ScenicSpot {
     private String entityType;  // Google Places type string or OsmEntityType.name()
     private String openingHoursJson;
     private int segmentIndex;
+    private String selectionPhase; // "P0", "P0c", "P1", "P2" label coded prefix for ease of test validation
+    private String searchSource;   // "NB", "KW" label coded prefix for ease of test validation
+    /**
+     * Debug code for selection phase and search source tracking. Only populated
+     * when DebugConfig.SHOW_SELECTION_DEBUG = true. Format: "[phase/source]"
+     * e.g.: "NB" = found via searchNearby "KW" = found via searchText keyword
+     * "NB-WR" = found via searchNearby wide radius retry "KW-WR" = found via
+     * searchText keyword wide radius retry "P0/NB" = Pass 0 anchor, found via
+     * searchNearby "P0c/KW" = Pass 0 companion, found via keyword search
+     * "P1/NB" = Pass 1 selection, found via searchNearby "P2/KW" = Pass 2
+     * diffusion, found via keyword search
+     */
+    private String selectionDebugCode;
+    
+    
 
-    // 3. THE COPY CONSTRUCTOR (The one you just asked for)
+    // 3. THE COPY CONSTRUCTOR 
     public ScenicSpot(ScenicSpot other) {
         this.name = other.name;
         this.placeId = other.placeId;
@@ -45,8 +60,11 @@ public class ScenicSpot {
         this.entityType = other.entityType;
         this.openNow = other.openNow;
         this.businessStatus = other.businessStatus;
-        this.openingHoursJson = other.openingHoursJson; // add this
-        this.segmentIndex = other.segmentIndex;         // add this
+        this.openingHoursJson = other.openingHoursJson; 
+        this.segmentIndex = other.segmentIndex;         
+        this.selectionPhase = other.selectionPhase;
+        this.selectionDebugCode = other.selectionDebugCode;
+
     }
 
     /**

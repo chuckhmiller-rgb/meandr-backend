@@ -63,6 +63,7 @@ com/meandr/meandrDataServices/controller/GoogleApiProxyController.class
 com/meandr/meandrDataServices/service/EntityPreferenceService$PreferenceEntry.class
 com/meandr/meandrDataServices/model/ClimbingGym$ClimbingGymBuilder.class
 com/meandr/meandrDataServices/service/ParkService.class
+com/meandr/meandrDataServices/config/DebugConfig.class
 com/meandr/meandrDataServices/mapper/UsersFieldUpdateMapperImpl.class
 com/meandr/meandrDataServices/config/OpenApiConfig.class
 com/meandr/meandrDataServices/model/Users$UsersBuilder.class

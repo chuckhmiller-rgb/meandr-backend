@@ -9,6 +9,7 @@ import com.google.maps.model.DirectionsResult;
 import com.google.maps.model.DirectionsRoute;
 import com.google.maps.model.DirectionsStep;
 import com.google.maps.model.TravelMode;
+import com.meandr.meandrDataServices.config.DebugConfig;
 import com.meandr.meandrDataServices.controller.GoogleApiProxyController;
 import com.meandr.meandrDataServices.dto.*;
 import com.meandr.meandrDataServices.model.ScenicSpot;
@@ -30,6 +31,7 @@ import com.meandr.meandrDataServices.scoring.WaypointScoringService;
 import com.meandr.meandrDataServices.scoring.ScoredWaypoint;
 import com.meandr.meandrDataServices.scoring.GooglePlaceCandidate;
 import com.meandr.meandrDataServices.util.GooglePlacesTypeMapper;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -150,6 +152,7 @@ public class RouteBeautifierService {
             baselineDurationMins = estimateDuration(routeCoords);
             encodedPolyline = encodePolyline(routeCoords);
             log.info("Using pre-selected route: {} coords, estimated {} mins", routeCoords.size(), baselineDurationMins);
+
         } else {
             // Fetch routes from Directions API
             com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
@@ -384,7 +387,8 @@ public class RouteBeautifierService {
                 routeEnhancementThreshold,
                 dwellTimePerStop,
                 excludeOrigin,
-                excludeDest
+                excludeDest,
+                entityPreferences
         );
 
         log.info("Selected {} waypoints from {} candidates", topCandidates.size(), candidates.size());
@@ -571,7 +575,8 @@ public class RouteBeautifierService {
             double routeEnhancementThreshold,
             int dwellTimePerStop,
             boolean excludeOrigin,
-            boolean excludeDest
+            boolean excludeDest,
+            List<String> entityPreferences
     ) {
         double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
         int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
@@ -638,6 +643,14 @@ public class RouteBeautifierService {
                         .mapToDouble(ScenicSpot::getDistFromStart)
                         .max().orElse(0)));
 
+        // Build preferred Google types set for strict preference filtering
+        Set<String> preferredGoogleTypes = entityPreferences.stream()
+                .flatMap(p -> GooglePlacesTypeMapper.toGoogleTypes(List.of(p)).stream())
+                .collect(Collectors.toSet());
+        boolean hasStrictPrefs = !preferredGoogleTypes.isEmpty();
+        log.info("Building preferredGoogleTypes: {} preferredGoogleTypes and hasStrictPrefs={})",
+                preferredGoogleTypes, hasStrictPrefs);
+
         // =============================================================
 // PASS 0: Global scoring with balanced segment distribution
 // =============================================================
@@ -652,10 +665,19 @@ public class RouteBeautifierService {
             Optional<ScenicSpot> anchorOpt = allFoundSpots.stream()
                     .filter(wp -> wp.getRating() >= 4.5)
                     .filter(wp -> wp.getUserRatingsTotal() >= 1000)
+                    .filter(wp -> !hasStrictPrefs || preferredGoogleTypes.contains(wp.getEntityType()))
                     .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
                     .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
             if (anchorOpt.isPresent()) {
                 anchorOpt.get().setSegmentIndex(seg);
+
+                if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                    ScenicSpot a = anchorOpt.get();
+                    a.setSelectionPhase("P0");
+                    String src = a.getSearchSource() != null ? a.getSearchSource() : "";
+                    a.setSelectionDebugCode("P0" + (src.isEmpty() ? "" : "/" + src));
+                }
+
                 anchorBySegment.put(seg, anchorOpt.get());
             }
         }
@@ -685,7 +707,17 @@ public class RouteBeautifierService {
                 if (haversineKm(anchor.getLat(), anchor.getLng(), wp.getLat(), wp.getLng()) > 10.0) {
                     continue;
                 }
+                if (hasStrictPrefs && !preferredGoogleTypes.contains(wp.getEntityType())) {
+                    continue;
+                }
                 wp.setSegmentIndex(anchor.getSegmentIndex());
+
+                if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                    wp.setSelectionPhase("P0c");
+                    String src = wp.getSearchSource() != null ? wp.getSearchSource() : "";
+                    wp.setSelectionDebugCode("P0c" + (src.isEmpty() ? "" : "/" + src));
+                }
+
                 companionPool.add(wp);
                 companionPlaceIds.add(wp.getPlaceId());
             }
@@ -761,6 +793,7 @@ public class RouteBeautifierService {
                     .filter(wp -> wp.getRating() >= 4.5)
                     .filter(wp -> wp.getUserRatingsTotal() >= 100)
                     .filter(wp -> !pass0PlaceIds.contains(wp.getPlaceId()))
+                    .filter(wp -> !hasStrictPrefs || preferredGoogleTypes.contains(wp.getEntityType()))
                     .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
                     .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
 
@@ -862,7 +895,7 @@ public class RouteBeautifierService {
 
             segmentSpent[seg] = runSegmentSelection(
                     seg, bySegment.get(seg), effectiveBudget,
-                    finalSelection, dwellTimePerStop, segmentSpent[seg], totalPathLength);
+                    finalSelection, dwellTimePerStop, segmentSpent[seg], totalPathLength, "P1");
 
             log.info("  Segment {}: consumed={} mins, unspent={} mins, waypoints selected={}",
                     seg,
@@ -957,7 +990,7 @@ public class RouteBeautifierService {
                         double before = segmentSpent[neighbor];
                         segmentSpent[neighbor] = runSegmentSelection(
                                 neighbor, bySegment.get(neighbor), effectiveBudget,
-                                finalSelection, dwellTimePerStop, segmentSpent[neighbor], totalPathLength);
+                                finalSelection, dwellTimePerStop, segmentSpent[neighbor], totalPathLength, "P2");
 
                         double consumed = segmentSpent[neighbor] - before;
                         consumedAtRadius += consumed;
@@ -1016,6 +1049,9 @@ public class RouteBeautifierService {
         }
 
         finalSelection.sort(Comparator.comparingDouble(ScenicSpot::getDistFromStart));
+        log.info("Finally selected waypoints: {}", finalSelection.stream()
+                .map(s -> s.getName() + " (" + s.getLat() + "," + s.getLng() + ")")
+                .collect(Collectors.joining(", ")));
         return finalSelection;
     }
 
@@ -1026,17 +1062,15 @@ public class RouteBeautifierService {
             List<ScenicSpot> finalSelection,
             int dwellTimePerStop,
             double alreadySpent,
-            double totalPathLengthKm
+            double totalPathLengthKm,
+            String phase // "P1" or "P2"
     ) {
-
         double spent = alreadySpent;
-
         log.info("    runSegmentSelection seg={} budget={} alreadySpent={} candidates={}",
                 segIndex,
                 String.format("%.1f", budget),
                 String.format("%.1f", alreadySpent),
                 candidates.size());
-
         for (ScenicSpot spot : candidates) {
             if (finalSelection.contains(spot)) {
                 continue;
@@ -1050,12 +1084,16 @@ public class RouteBeautifierService {
             if (qualityScore < MIN_QUALITY_SCORE) {
                 log.info("      ~ skipped (low quality): {} (quality={})",
                         spot.getName(), String.format("%.1f", qualityScore));
-                break; // candidates sorted desc by score — all remaining also low quality
+                break;
             }
-
             double cost = spot.getDetour() + dwellTimePerStop;
             if (spent + cost <= budget) {
                 if (isSpaceAvailable(finalSelection, spot, totalPathLengthKm)) {
+                    if (DebugConfig.SHOW_SELECTION_DEBUG && spot.getSelectionPhase() == null) {
+                        spot.setSelectionPhase(phase);
+                        String src = spot.getSearchSource() != null ? spot.getSearchSource() : "";
+                        spot.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
+                    }
                     finalSelection.add(spot);
                     spent += cost;
                     log.info("      + added: {} (cost={}, spent={}/{})",
@@ -1074,7 +1112,6 @@ public class RouteBeautifierService {
                         String.format("%.1f", budget));
             }
         }
-
         return spent;
     }
 
@@ -1097,26 +1134,40 @@ public class RouteBeautifierService {
             LatLng dest,
             double routeEnhancementThreshold
     ) {
+
+        log.info("findScenicSpotsAlongPath: path size={}, first={},{}, middle={},{}, last={},{}",
+                path.size(),
+                path.get(0).lat, path.get(0).lng,
+                path.get(path.size() / 2).lat, path.get(path.size() / 2).lng,
+                path.get(path.size() - 1).lat, path.get(path.size() - 1).lng);
         List<ScenicSpot> candidates = new ArrayList<>();
         Set<String> seenPlaceIds = new HashSet<>();
-        double odometer = 0;
-        double lastSearchOdometer = 0;
-
         List<ScenicSpot> rawGoogleSpots = new ArrayList<>();
         Map<Integer, Integer> zoneResultCounts = new HashMap<>();
 
-        // ── Google Places pass ────────────────────────────────────────────────
+        // Split entity prefs into keyword vs non-keyword types (done once, reused in all passes)
+        List<String> keywordTypes = entityPreferences.stream()
+                .filter(GoogleApiProxyController.ENTITY_KEYWORDS::containsKey)
+                .collect(Collectors.toList());
+        List<String> nearbyTypes = entityPreferences.stream()
+                .filter(e -> !GoogleApiProxyController.ENTITY_KEYWORDS.containsKey(e))
+                .collect(Collectors.toList());
+
+        // ── Google Places main pass ───────────────────────────────────────────
+        double odometer = 0;
+        double lastSearchOdometer = 0;
         for (int i = 0; i < path.size() - 1; i += samplingStep) {
             LatLng p1 = path.get(i);
-            LatLng p2 = path.get(Math.min(i + samplingStep, path.size() - 1));
-            double stepDist = haversine(p1.lat, p1.lng, p2.lat, p2.lng);
+            double stepDist = haversine(p1.lat, p1.lng,
+                    path.get(Math.min(i + samplingStep, path.size() - 1)).lat,
+                    path.get(Math.min(i + samplingStep, path.size() - 1)).lng);
             odometer += stepDist;
 
             if (odometer - lastSearchOdometer >= 15.0) {
                 lastSearchOdometer = odometer;
-
                 int zoneIndex = (int) (odometer / 60.0);
                 int priorZoneResults = zoneResultCounts.getOrDefault(zoneIndex, 0);
+
                 int adaptiveRadius = radius;
                 if (priorZoneResults == 0 && odometer > 60.0) {
                     adaptiveRadius = Math.min(radius * 3, 15000);
@@ -1124,77 +1175,28 @@ public class RouteBeautifierService {
                             zoneIndex, String.format("%.1f", odometer), adaptiveRadius);
                 }
 
-                // Split entity prefs into keyword vs non-keyword types
-                List<String> keywordTypes = entityPreferences.stream()
-                        .filter(GoogleApiProxyController.ENTITY_KEYWORDS::containsKey)
-                        .collect(Collectors.toList());
-                List<String> nearbyTypes = entityPreferences.stream()
-                        .filter(e -> !GoogleApiProxyController.ENTITY_KEYWORDS.containsKey(e))
-                        .collect(Collectors.toList());
-
-                // Standard searchNearby for well-supported types
-                List<ScenicSpot> nearbyResults = nearbyTypes.isEmpty()
-                        ? Collections.emptyList()
-                        : googleProxy.searchNearbyScenic(p1.lat, p1.lng, adaptiveRadius, nearbyTypes);
-
-                // searchText for keyword-enhanced types
-                List<ScenicSpot> keywordResults = new ArrayList<>();
-                for (String entityType : keywordTypes) {
-                    String keyword = GoogleApiProxyController.ENTITY_KEYWORDS.get(entityType);
-                    List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(List.of(entityType));
-                    keywordResults.addAll(
-                            googleProxy.searchTextScenic(p1.lat, p1.lng, adaptiveRadius, keyword, googleTypes)
-                    );
-                }
-
-                // Merge both result lists
-                List<ScenicSpot> allNearby = new ArrayList<>();
-                allNearby.addAll(nearbyResults);
-                allNearby.addAll(keywordResults);
-
-                int qualifiedCount = 0;
-                for (ScenicSpot spot : allNearby) {
-                    if (spot.getRating() == 0 && spot.getUserRatingsTotal() == 0) {
-                        log.debug("Filtered zero-rating result: {}", spot.getName());
-                        continue;
-                    }
-                    int minReviews = MIN_REVIEWS.getOrDefault(spot.getEntityType(), 5);
-                    if (spot.getUserRatingsTotal() < minReviews) {
-                        log.debug("Filtered low-review result: {} ({} reviews, min={})",
-                                spot.getName(), spot.getUserRatingsTotal(), minReviews);
-                        continue;
-                    }
-                    if (seenPlaceIds.contains(spot.getPlaceId())) {
-                        continue;
-                    }
-                    seenPlaceIds.add(spot.getPlaceId());
-                    spot.setDistFromStart(odometer);
-                    double score = calculateScore(spot, p1, totalDist, routeEnhancementThreshold, dest);
-                    spot.setScore(score);
-                    rawGoogleSpots.add(spot);
-                    qualifiedCount++;
-                }
-                zoneResultCounts.merge(zoneIndex, qualifiedCount, Integer::sum);
+                int added = searchAndCollect(p1.lat, p1.lng, adaptiveRadius,
+                        nearbyTypes, keywordTypes, "NB", "KW",
+                        odometer, totalDist, routeEnhancementThreshold, dest,
+                        seenPlaceIds, rawGoogleSpots);
+                zoneResultCounts.merge(zoneIndex, added, Integer::sum);
             }
         }
 
-        // ── Wide radius retry for sparse zones ────────────────────────────────
-        int[] retryMultipliers = {2, 3};
-        for (int multiplier : retryMultipliers) {
+        // ── Wide radius retry for sparse zones ───────────────────────────────
+        for (int multiplier : new int[]{2, 3}) {
             odometer = 0;
             lastSearchOdometer = 0;
-
             for (int i = 0; i < path.size() - 1; i += samplingStep) {
                 LatLng p1 = path.get(i);
-                LatLng p2 = path.get(Math.min(i + samplingStep, path.size() - 1));
-                double stepDist = haversine(p1.lat, p1.lng, p2.lat, p2.lng);
+                double stepDist = haversine(p1.lat, p1.lng,
+                        path.get(Math.min(i + samplingStep, path.size() - 1)).lat,
+                        path.get(Math.min(i + samplingStep, path.size() - 1)).lng);
                 odometer += stepDist;
 
                 if (odometer - lastSearchOdometer >= 15.0) {
                     lastSearchOdometer = odometer;
                     int zoneIndex = (int) (odometer / 60.0);
-
-                    // Only retry sparse zones
                     if (zoneResultCounts.getOrDefault(zoneIndex, 0) > 0) {
                         continue;
                     }
@@ -1203,62 +1205,25 @@ public class RouteBeautifierService {
                     log.info("Wide retry x{} at {}km zone {} — radius={}",
                             multiplier, String.format("%.1f", odometer), zoneIndex, wideRadius);
 
-                    // Same split logic as main pass
-                    List<String> keywordTypes = entityPreferences.stream()
-                            .filter(GoogleApiProxyController.ENTITY_KEYWORDS::containsKey)
-                            .collect(Collectors.toList());
-                    List<String> nearbyTypes = entityPreferences.stream()
-                            .filter(e -> !GoogleApiProxyController.ENTITY_KEYWORDS.containsKey(e))
-                            .collect(Collectors.toList());
-
-                    List<ScenicSpot> nearbyResults = nearbyTypes.isEmpty()
-                            ? Collections.emptyList()
-                            : googleProxy.searchNearbyScenic(p1.lat, p1.lng, wideRadius, nearbyTypes);
-
-                    List<ScenicSpot> keywordResults = new ArrayList<>();
-                    for (String entityType : keywordTypes) {
-                        String keyword = GoogleApiProxyController.ENTITY_KEYWORDS.get(entityType);
-                        List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(List.of(entityType));
-                        keywordResults.addAll(
-                                googleProxy.searchTextScenic(p1.lat, p1.lng, wideRadius, keyword, googleTypes)
-                        );
-                    }
-
-                    List<ScenicSpot> allNearby = new ArrayList<>();
-                    allNearby.addAll(nearbyResults);
-                    allNearby.addAll(keywordResults);
-
-                    int qualifiedCount = 0;
-                    for (ScenicSpot spot : allNearby) {
-                        if (spot.getRating() == 0 && spot.getUserRatingsTotal() == 0) {
-                            continue;
-                        }
-                        int minReviews = MIN_REVIEWS.getOrDefault(spot.getEntityType(), 5);
-                        if (spot.getUserRatingsTotal() < minReviews) {
-                            continue;
-                        }
-                        if (seenPlaceIds.contains(spot.getPlaceId())) {
-                            continue;
-                        }
-                        seenPlaceIds.add(spot.getPlaceId());
-                        spot.setDistFromStart(odometer);
-                        double score = calculateScore(spot, p1, totalDist, routeEnhancementThreshold, dest);
-                        spot.setScore(score);
-                        rawGoogleSpots.add(spot);
-                        qualifiedCount++;
-                    }
-                    zoneResultCounts.merge(zoneIndex, qualifiedCount, Integer::sum);
+                    int added = searchAndCollect(p1.lat, p1.lng, wideRadius,
+                            nearbyTypes, keywordTypes, "NB-WR", "KW-WR",
+                            odometer, totalDist, routeEnhancementThreshold, dest,
+                            seenPlaceIds, rawGoogleSpots);
+                    zoneResultCounts.merge(zoneIndex, added, Integer::sum);
                 }
             }
         }
 
-        // Destination wide-radius search
+        // ── Destination wide-radius search ───────────────────────────────────
         int destZoneIndex = (int) (totalDist / 60.0);
         if (zoneResultCounts.getOrDefault(destZoneIndex, 0) < 3) {
             int destRadius = Math.min(radius * 4, 25000);
             log.info("Destination zone sparse — wide search near dest (radius={})", destRadius);
             List<ScenicSpot> destNearby = googleProxy.searchNearbyScenic(
                     dest.lat, dest.lng, destRadius, entityPreferences);
+            if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                destNearby.forEach(s -> s.setSearchSource("NB-DEST"));
+            }
             for (ScenicSpot spot : destNearby) {
                 if (spot.getRating() == 0 && spot.getUserRatingsTotal() == 0) {
                     continue;
@@ -1268,79 +1233,10 @@ public class RouteBeautifierService {
                 }
                 seenPlaceIds.add(spot.getPlaceId());
                 spot.setDistFromStart(totalDist);
-                double score = calculateScore(spot, dest, totalDist, routeEnhancementThreshold, dest);
-                spot.setScore(score);
+                spot.setScore(calculateScore(spot, dest, totalDist, routeEnhancementThreshold, dest));
                 rawGoogleSpots.add(spot);
             }
         }
-
-        /* ── OSM pass ─────────────────────────────────────────────────────────
-        List<OsmSearchRequest.LatLng> osmPoints = new ArrayList<>();
-        for (int i = 0; i < path.size(); i += Math.max(1, samplingStep * 2)) {
-            osmPoints.add(new OsmSearchRequest.LatLng(path.get(i).lat, path.get(i).lng));
-        }
-
-        // Map string preference IDs → OsmEntityType enum values (unknown strings skipped)
-        List<OsmEntityType> osmTypes = entityPreferences.stream()
-                .map(s -> {
-                    try {
-                        return OsmEntityType.valueOf(s.toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        return null;
-                    }
-                })
-                .filter(t -> t != null)
-                .collect(Collectors.toList());
-
-        // Use default scenic set if no preferences match OSM types
-        if (osmTypes.isEmpty()) {
-            osmTypes = List.of(
-                    OsmEntityType.WATERFALL, OsmEntityType.SCENIC_OVERLOOK,
-                    OsmEntityType.TRAILHEAD, OsmEntityType.RUINS,
-                    OsmEntityType.PEAK, OsmEntityType.NATURE_RESERVE,
-                    OsmEntityType.ARCHAEOLOGICAL_SITE, OsmEntityType.ATTRACTION
-            );
-        }
-
-        OsmSearchRequest osmRequest = new OsmSearchRequest();
-        osmRequest.setRoutePoints(osmPoints);
-        osmRequest.setEntityTypes(osmTypes);
-        osmRequest.setCorridorRadiusMiles(radius / 1609.344);
-        osmRequest.setMaxResults(100);
-
-        List<OsmPlace> osmPlaces = Collections.emptyList();
-        /* OSM stubbed out
-        try {
-            osmPlaces = osmService.searchAlongRoute(osmRequest);
-            log.info("OSM returned {} candidates", osmPlaces.size());
-        } catch (Exception e) {
-            log.warn("OSM search failed — proceeding with Google-only results: {}", e.getMessage());
-        }   
-
-        // ── Snap OSM places to route for accurate along-route position ────────
-        // OsmService sets distanceFromRouteMiles as perpendicular off-route distance.
-        // We need the along-route odometer position for correct segment bucketing
-        // and for distFromStart on the final ScenicSpot.
-        // Walk the path once per OSM place and find the nearest path point.
-        for (OsmPlace p : osmPlaces) {
-            double minDist = Double.MAX_VALUE;
-            double bestOdometer = 0;
-            double odo = 0;
-            for (int i = 0; i < path.size() - 1; i++) {
-                odo += haversine(path.get(i).lat, path.get(i).lng,
-                        path.get(i + 1).lat, path.get(i + 1).lng);
-                double d = haversine(p.getLatitude(), p.getLongitude(),
-                        path.get(i).lat, path.get(i).lng);
-                if (d < minDist) {
-                    minDist = d;
-                    bestOdometer = odo;
-                }
-            }
-            // Estimate detour from perpendicular distance: round-trip at 80 km/h
-            p.setDetourMinutes(minDist * 2.0 / 80.0 * 60.0);
-            // Repurpose distanceFromRouteMiles to hold along-route km for bucketing
-            p.setDistanceFromRouteMiles(bestOdometer);
-        }*/
 
         // ── Convert Google spots → GooglePlaceCandidate ───────────────────────
         List<GooglePlaceCandidate> googleCandidates = rawGoogleSpots.stream().map(s -> {
@@ -1354,17 +1250,16 @@ public class RouteBeautifierService {
             c.setUserRatingCount(s.getUserRatingsTotal());
             c.setDetourMinutes((double) s.getDetour());
             c.setDistFromStart(s.getDistFromStart());
-            c.setEntityType(s.getEntityType());  // ← add this
+            c.setEntityType(s.getEntityType());
             c.setOpeningHoursJson(s.getOpeningHoursJson());
+            c.setSelectionDebugCode(s.getSearchSource());
             return c;
         }).collect(Collectors.toList());
 
         // ── Score & interleave per segment ────────────────────────────────────
-        // Use same segment count as getEscalatedSelection for consistent bucketing
         int numSegments = Math.max(2, Math.min(10, (int) (totalDist / 60.0)));
         double segmentLength = totalDist / numSegments;
 
-        // Bucket Google candidates by segment
         Map<Integer, List<GooglePlaceCandidate>> googleBySegment = new HashMap<>();
         for (int i = 0; i < numSegments; i++) {
             googleBySegment.put(i, new ArrayList<>());
@@ -1374,33 +1269,21 @@ public class RouteBeautifierService {
             googleBySegment.get(seg).add(c);
         }
 
-        // Bucket OSM candidates by segment using snapped along-route position
         Map<Integer, List<OsmPlace>> osmBySegment = new HashMap<>();
         for (int i = 0; i < numSegments; i++) {
             osmBySegment.put(i, new ArrayList<>());
         }
-        /*for (OsmPlace p : osmPlaces) {
-            int seg = Math.min((int) (p.getDistanceFromRouteMiles() / segmentLength), numSegments - 1);
-            osmBySegment.get(seg).add(p);
-        }*/
 
-        // Score and interleave within each segment, then flatten in segment order
-        // so getEscalatedSelection sees a geographically ordered candidate list
         Set<String> addedIds = new HashSet<>();
         for (int seg = 0; seg < numSegments; seg++) {
             List<ScoredWaypoint> scored = waypointScoringService.scoreAndInterleave(
-                    googleBySegment.get(seg),
-                    osmBySegment.get(seg),
-                    entityPreferences,
-                    50
-            );
+                    googleBySegment.get(seg), osmBySegment.get(seg), entityPreferences, 50);
             for (ScoredWaypoint sw : scored) {
                 String uid = sw.getId() != null ? sw.getId() : sw.getName();
                 if (uid == null || addedIds.contains(uid)) {
                     continue;
                 }
                 addedIds.add(uid);
-
                 ScenicSpot spot = new ScenicSpot();
                 spot.setName(sw.getName());
                 spot.setAddress(sw.getAddress() != null ? sw.getAddress() : "");
@@ -1413,15 +1296,75 @@ public class RouteBeautifierService {
                 spot.setScore(sw.getScore());
                 spot.setDetour(sw.getDetourMinutes() != null ? sw.getDetourMinutes().intValue() : 0);
                 spot.setEntityType(sw.getEntityType());
-                // distFromStart holds along-route km (set during Google pass or OSM snapping above)
                 spot.setDistFromStart(sw.getDistFromStart() != null ? sw.getDistFromStart() : 0.0);
+                spot.setSelectionDebugCode(sw.getSelectionDebugCode());
                 candidates.add(spot);
             }
         }
 
         log.info("findScenicSpotsAlongPath: {} total candidates (Google={}, segments={})",
-                candidates.size(), googleCandidates.size(),  numSegments);
+                candidates.size(), googleCandidates.size(), numSegments);
         return candidates;
+    }
+
+    private int searchAndCollect(
+            double lat, double lng, int searchRadius,
+            List<String> nearbyTypes, List<String> keywordTypes,
+            String nearbyTag, String keywordTag,
+            double odometer, double totalDist, double routeEnhancementThreshold, LatLng dest,
+            Set<String> seenPlaceIds, List<ScenicSpot> rawGoogleSpots) {
+
+        // Fetch nearby and keyword results
+        List<ScenicSpot> nearbyResults = nearbyTypes.isEmpty()
+                ? Collections.emptyList()
+                : googleProxy.searchNearbyScenic(lat, lng, searchRadius, nearbyTypes);
+
+        List<ScenicSpot> keywordResults = new ArrayList<>();
+        for (String entityType : keywordTypes) {
+            String keyword = GoogleApiProxyController.ENTITY_KEYWORDS.get(entityType);
+            List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(List.of(entityType));
+            keywordResults.addAll(googleProxy.searchTextScenic(lat, lng, searchRadius, keyword, googleTypes));
+        }
+
+        // Tag debug source before merging
+        if (DebugConfig.SHOW_SELECTION_DEBUG) {
+            nearbyResults.forEach(s -> s.setSearchSource(nearbyTag));
+            keywordResults.forEach(s -> s.setSearchSource(keywordTag));
+        }
+
+        // Merge and post-filter by actual distance — searchText locationBias is a soft hint
+        // and can return results from anywhere in the country
+        double searchRadiusKm = searchRadius / 1000.0;
+        List<ScenicSpot> allNearby = Stream.concat(nearbyResults.stream(), keywordResults.stream())
+                .filter(spot -> haversineKm(spot.getLat(), spot.getLng(), lat, lng) <= searchRadiusKm)
+                .collect(Collectors.toList());
+
+        // Filter, score and collect qualified spots
+        LatLng p1 = new LatLng(lat, lng);
+        int qualifiedCount = 0;
+        for (ScenicSpot spot : allNearby) {
+            if (spot.getRating() == 0 && spot.getUserRatingsTotal() == 0) {
+                continue;
+            }
+            int minReviews = MIN_REVIEWS.getOrDefault(spot.getEntityType(), 5);
+            if (spot.getUserRatingsTotal() < minReviews) {
+                continue;
+            }
+            if (seenPlaceIds.contains(spot.getPlaceId())) {
+                continue;
+            }
+            seenPlaceIds.add(spot.getPlaceId());
+            spot.setDistFromStart(odometer);
+            spot.setScore(calculateScore(spot, p1, totalDist, routeEnhancementThreshold, dest));
+            rawGoogleSpots.add(spot);
+            if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                log.info("Qualified spot: {} at {},{} distFromStart={}km source={}",
+                        spot.getName(), spot.getLat(), spot.getLng(),
+                        String.format("%.1f", odometer), spot.getSearchSource());
+            }
+            qualifiedCount++;
+        }
+        return qualifiedCount;
     }
 
     private double calculateScore(
