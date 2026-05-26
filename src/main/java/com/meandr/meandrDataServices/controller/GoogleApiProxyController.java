@@ -66,35 +66,66 @@ public class GoogleApiProxyController {
             "car_dealer", "car_repair", "car_wash", "laundry", "post_office", "restaurant"
     );
 
-    private static final List<String> TYPE_PRIORITY = List.of(
-            "dog_park", "botanical_garden", "zoo", "aquarium", "campground",
-            "amusement_park", "art_gallery",
-            "restaurant", "fast_food_restaurant", "cafe", "bar", "bakery", "night_club",
-            "museum", "historical_landmark",
-            "national_park", "hiking_area", "tourist_attraction",
+    private static final List<String> MOST_RELEVANT_TYPE = List.of(
+            // Most specific natural/outdoor types first
+            "national_park", "state_park", "wildlife_refuge", "wildlife_park",
+            "botanical_garden", "dog_park", "campground", "rv_park",
+            "hiking_area", "picnic_ground", "off_roading_area", "adventure_sports_center",
+            // Water
+            "beach", "marina",
+            // Animals
+            "zoo", "aquarium",
+            // History & Culture (specific before generic)
+            "castle", "monument", "sculpture",
+            "history_museum", "art_museum", "museum", "art_gallery",
+            "historical_landmark", "cultural_landmark", "historical_place",
+            "performing_arts_theater", "library",
+            // Food & Drink (specific before generic)
+            "brewery", "brewpub", "beer_garden", "vineyard",
+            "cocktail_bar", "bar", "night_club",
+            "bakery", "coffee_shop", "cafe",
+            "fast_food_restaurant", "restaurant",
+            "market",
+            // Entertainment
+            "amusement_park", "observation_deck",
+            // Civic
+            "university", "stadium", "sports_complex",
+            "courthouse", "city_hall", "plaza", "town_square",
+            // Worship
             "church", "synagogue", "mosque", "hindu_temple",
-            "university", "stadium", "courthouse", "city_hall",
-            "lodging", "gas_station", "park"
+            // Rest & Refuel
+            "lodging", "gas_station", "convenience_store", "rest_stop",
+            // Broad types last
+            "tourist_attraction", "park", "city_park", "natural_feature"
     );
 
     public static final Map<String, String> ENTITY_KEYWORDS = Map.ofEntries(
             Map.entry("WATERFALL", "waterfall falls cascade"),
-            Map.entry("CLIMBING_CRAG", "climbing crag route"),
-            Map.entry("BOULDER", "bouldering boulder climbing route"),
-            Map.entry("HOT_SPRING", "hotspring thermal spring"),
+            Map.entry("CLIMBING_CRAG", "climbing crag rock face"),
+            Map.entry("BOULDER", "bouldering boulder"),
+            Map.entry("HOT_SPRING", "hot spring thermal spring"),
             Map.entry("BIRD_HIDE", "bird hide birding wildlife blind"),
             Map.entry("SWIMMING_HOLE", "swimming hole swimming creek"),
             Map.entry("CAVE", "cave cavern grotto"),
-            Map.entry("DARK_SKY_AREA", "dark sky stargazing darksky"),
-            Map.entry("SCENIC_OVERLOOK", "overlook scenic viewpoint vista"),
+            Map.entry("DARK_SKY_AREA", "dark sky stargazing"),
+            Map.entry("SCENIC_OVERLOOK", "scenic overlook viewpoint vista"),
             Map.entry("PEAK", "mountain peak summit"),
             Map.entry("RIVER_ACCESS", "river access boat launch canoe kayak"),
-            Map.entry("GHOST_TOWN", "ghost town abandoned historic ruins"),
+            Map.entry("GHOST_TOWN", "ghost town abandoned"),
             Map.entry("ARCHAEOLOGICAL_SITE", "archaeological site ruins excavation"),
             Map.entry("TRAILHEAD", "trailhead trail access hiking"),
-            Map.entry("STATE_PARK", "state park"),
-            Map.entry("DOG_PARK", "dog park off leash"),
-            Map.entry("OBSERVATORY", "observatory telescope stargazing")
+            Map.entry("OBSERVATORY", "observatory telescope stargazing"),
+            Map.entry("HISTORIC_DISTRICT", "historic district"),
+            Map.entry("CASTLE", "castle fort fortress"),
+            Map.entry("WILDERNESS_HUT", "wilderness hut backcountry shelter cabin"),
+            Map.entry("FISHING_SPOT", "fishing spot fishing access"),
+            Map.entry("SPRING", "natural spring freshwater spring"),
+            Map.entry("RUINS", "ruins abandoned historic"),
+            Map.entry("ARTWORK", "public art sculpture mural"),
+            Map.entry("DISTILLERY", "distillery whiskey bourbon spirits"),
+            Map.entry("FARMERS_MARKET", "farmers market local market"),
+            Map.entry("MILESTONE", "historic marker milestone"),
+            Map.entry("WAYSIDE_SHRINE", "wayside shrine roadside shrine")
     );
 
     @Autowired
@@ -238,7 +269,7 @@ public class GoogleApiProxyController {
     }
 
     public List<ScenicSpot> searchTextScenic(double lat, double lng, int radius, String keyword, List<String> googleTypes) { // --- Tier 1: MySQL persistent cache ---
-    
+
         // --- Tier 1: MySQL persistent cache ---
         List<ScenicSpot> cached = placesCacheService.findNearby(lat, lng, radius, googleTypes);
         if (!cached.isEmpty()) {
@@ -502,7 +533,7 @@ public class GoogleApiProxyController {
             List<String> placeTypes = new ArrayList<>();
             node.get("types").forEach(t -> placeTypes.add(t.asText()));
             log.info("Place types for {}: {}", name, placeTypes);
-            String bestType = TYPE_PRIORITY.stream()
+            String bestType = MOST_RELEVANT_TYPE.stream()
                     .filter(placeTypes::contains)
                     .findFirst()
                     .orElse(placeTypes.get(0));
