@@ -649,6 +649,8 @@ public class RouteBeautifierService {
                 -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("NB");
         java.util.function.Predicate<ScenicSpot> isPO = wp
                 -> wp.getSearchSource() == null || (!wp.getSearchSource().startsWith("KW") && !wp.getSearchSource().startsWith("NB"));
+        java.util.function.Predicate<ScenicSpot> isTypeMatch = wp
+                -> preferredGoogleTypes.contains(wp.getEntityType());
 
         // ── Helper: run one anchor+companion pass for a given anchor predicate ──
         // Finds best anchor per empty segment, clusters KW→NB→PO companions within 10km
@@ -697,7 +699,10 @@ public class RouteBeautifierService {
 
                 anchor.setSegmentIndex(seg);
                 if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                    String phase = passName.contains("0") ? "P0" : passName.contains("1") ? "P1" : "P2";
+                    String phase = passName.contains("0.5") ? "P0.5"
+                            : passName.contains("0") ? "P0"
+                            : passName.contains("1") ? "P1"
+                            : "P2";
                     String src = anchor.getSearchSource() != null ? anchor.getSearchSource() : "";
                     anchor.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
                 }
@@ -738,7 +743,10 @@ public class RouteBeautifierService {
 
                         companion.setSegmentIndex(seg);
                         if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                            String phase = passName.contains("0") ? "P0c" : passName.contains("1") ? "P1c" : "P2c";
+                            String phase = passName.contains("0.5") ? "P0.5c"
+                                    : passName.contains("0") ? "P0c"
+                                    : passName.contains("1") ? "P1c"
+                                    : "P2c";
                             String src = companion.getSearchSource() != null ? companion.getSearchSource() : "";
                             companion.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
                         }
@@ -760,6 +768,11 @@ public class RouteBeautifierService {
         // PASS 0: KW anchors + (KW→NB→PO companions)
         // =================================================================
         runAnchorPass.accept("PASS 0 (KW anchors)", isKW);
+
+        // =================================================================
+        // PASS 0.5: Type-matched anchors + (KW→NB→PO companions)
+        // =================================================================
+        runAnchorPass.accept("PASS 0.5 (type-matched anchors)", isTypeMatch);
 
         // =================================================================
         // PASS 1: NB anchors + (KW→NB→PO companions) for empty segments
