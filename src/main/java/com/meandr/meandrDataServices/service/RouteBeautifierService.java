@@ -139,6 +139,12 @@ public class RouteBeautifierService {
                 routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest,
                 selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
 
+        log.info("selectedRouteCoords received: size={}, first={},{}, middle={},{}",
+                selectedRouteCoords.size(),
+                selectedRouteCoords.get(0).get(1), selectedRouteCoords.get(0).get(0),
+                selectedRouteCoords.get(selectedRouteCoords.size() / 2).get(1),
+                selectedRouteCoords.get(selectedRouteCoords.size() / 2).get(0));
+
         List<CoordinateDto> routeCoords;
         long baselineDurationMins;
         int meandrFactorBase = 250;
@@ -388,7 +394,8 @@ public class RouteBeautifierService {
                 dwellTimePerStop,
                 excludeOrigin,
                 excludeDest,
-                entityPreferences
+                entityPreferences,
+                routeCoords
         );
 
         log.info("Selected {} waypoints from {} candidates", topCandidates.size(), candidates.size());
@@ -576,13 +583,13 @@ public class RouteBeautifierService {
             int dwellTimePerStop,
             boolean excludeOrigin,
             boolean excludeDest,
-            List<String> entityPreferences
+            List<String> entityPreferences,
+            List<CoordinateDto> routeCoords
     ) {
         double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
         int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
         double segmentLength = totalPathLength / numSegments;
 
-        // Scale minimum segment budget with route length so long routes can afford city stops.
         double avgStopCostMins = 5.0 + (totalPathLength / 3000.0) * 15.0;
         double minSegmentBudget = avgStopCostMins + dwellTimePerStop;
         double budgetPerSegment = Math.max(minSegmentBudget, totalTimeBudget / numSegments);
@@ -592,6 +599,8 @@ public class RouteBeautifierService {
         Arrays.fill(segmentBudget, budgetPerSegment);
 
         List<ScenicSpot> finalSelection = new ArrayList<>();
+        Set<String> selectedPlaceIds = new HashSet<>();
+        int[] segmentCount = new int[numSegments];
 
         log.info("=== ESCALATED SELECTION START ===");
         log.info("Route: totalLength={} km, baseTrip={} mins, enhancement={}%, totalBudget={} mins",
@@ -601,33 +610,19 @@ public class RouteBeautifierService {
                 numSegments, String.format("%.1f", segmentLength), String.format("%.1f", budgetPerSegment));
         log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
 
-        log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
-
-        log.info("excludeDest check: totalPathLength={} km, threshold={} km, max distFromStart={} km",
-                String.format("%.1f", totalPathLength),
-                String.format("%.1f", totalPathLength - 40.0),
-                String.format("%.1f", allFoundSpots.stream()
-                        .mapToDouble(ScenicSpot::getDistFromStart)
-                        .max().orElse(0)));
-
-// Exclude stops near origin and destination
+        // Exclude stops near origin/destination
         if (excludeOrigin || excludeDest) {
             final double EXCLUDE_RADIUS_KM = 40.0;
-
-            // Get origin and dest coords for haversine check
             final double originLat = originPoint.lat;
             final double originLng = originPoint.lng;
             final double destLat = destinationPoint.lat;
             final double destLng = destinationPoint.lng;
-
             allFoundSpots = allFoundSpots.stream()
                     .filter(wp -> {
-                        if (excludeOrigin && haversineKm(wp.getLat(), wp.getLng(),
-                                originLat, originLng) < EXCLUDE_RADIUS_KM) {
+                        if (excludeOrigin && haversineKm(wp.getLat(), wp.getLng(), originLat, originLng) < EXCLUDE_RADIUS_KM) {
                             return false;
                         }
-                        if (excludeDest && haversineKm(wp.getLat(), wp.getLng(),
-                                destLat, destLng) < EXCLUDE_RADIUS_KM) {
+                        if (excludeDest && haversineKm(wp.getLat(), wp.getLng(), destLat, destLng) < EXCLUDE_RADIUS_KM) {
                             return false;
                         }
                         return true;
@@ -638,406 +633,228 @@ public class RouteBeautifierService {
         log.info("After exclude filter: {} candidates remain (excludeOrigin={}, excludeDest={})",
                 allFoundSpots.size(), excludeOrigin, excludeDest);
 
-        log.info("After exclude: max distFromStart={} km",
-                String.format("%.1f", allFoundSpots.stream()
-                        .mapToDouble(ScenicSpot::getDistFromStart)
-                        .max().orElse(0)));
+        final List<ScenicSpot> frozenSpots = Collections.unmodifiableList(allFoundSpots);
 
-        // Build preferred Google types set for strict preference filtering
+        // Build preferred Google types
         Set<String> preferredGoogleTypes = entityPreferences.stream()
                 .flatMap(p -> GooglePlacesTypeMapper.toGoogleTypes(List.of(p)).stream())
                 .collect(Collectors.toSet());
         boolean hasStrictPrefs = !preferredGoogleTypes.isEmpty();
-        log.info("Building preferredGoogleTypes: {} preferredGoogleTypes and hasStrictPrefs={})",
-                preferredGoogleTypes, hasStrictPrefs);
+        log.info("preferredGoogleTypes: {} hasStrictPrefs={}", preferredGoogleTypes, hasStrictPrefs);
 
-        // =============================================================
-// PASS 0: Global scoring with balanced segment distribution
-// =============================================================
-        List<ScenicSpot> pass0Selections = new ArrayList<>();
-        Set<String> pass0PlaceIds = new HashSet<>();
-        double pass0Remaining = totalTimeBudget;
+        // ── Source predicates ─────────────────────────────────────────────
+        java.util.function.Predicate<ScenicSpot> isKW = wp
+                -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("KW");
+        java.util.function.Predicate<ScenicSpot> isNB = wp
+                -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("NB");
+        java.util.function.Predicate<ScenicSpot> isPO = wp
+                -> wp.getSearchSource() == null || (!wp.getSearchSource().startsWith("KW") && !wp.getSearchSource().startsWith("NB"));
 
-// Step 1: Find best anchor candidate per segment
-        Map<Integer, ScenicSpot> anchorBySegment = new HashMap<>();
-        for (int i = 0; i < numSegments; i++) {
-            final int seg = i;
-            Optional<ScenicSpot> anchorOpt = allFoundSpots.stream()
-                    .filter(wp -> wp.getRating() >= 4.5)
-                    .filter(wp -> wp.getUserRatingsTotal() >= 1000)
-                    .filter(wp -> !hasStrictPrefs || preferredGoogleTypes.contains(wp.getEntityType()))
-                    .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
-                    .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
-            if (anchorOpt.isPresent()) {
-                anchorOpt.get().setSegmentIndex(seg);
+        // ── Helper: run one anchor+companion pass for a given anchor predicate ──
+        // Finds best anchor per empty segment, clusters KW→NB→PO companions within 10km
+        java.util.function.BiConsumer<String, java.util.function.Predicate<ScenicSpot>> runAnchorPass = (passName, anchorFilter) -> {
+            log.info("--- {} ---", passName);
 
+            for (int i = 0; i < numSegments; i++) {
+                if (segmentCount[i] > 0) {
+                    continue; // already has a stop
+                }
+                final int seg = i;
+
+                double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+                if (globalSpent >= totalTimeBudget) {
+                    break;
+                }
+
+                java.util.function.Predicate<ScenicSpot> inSeg = wp
+                        -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg;
+
+                // Find anchor — KW passes use lower review threshold since niche spots are rare
+                int minReviews = passName.contains("0") ? 100 : 1000;
+
+                Optional<ScenicSpot> anchorOpt = frozenSpots.stream()
+                        .filter(wp -> wp.getRating() >= 4.5)
+                        .filter(wp -> wp.getUserRatingsTotal() >= minReviews)
+                        .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                        .filter(inSeg)
+                        .filter(anchorFilter)
+                        .max(Comparator.comparingDouble(ScenicSpot::getScore));
+
+                if (anchorOpt.isEmpty()) {
+                    log.info("  {}: seg={} no anchor found", passName, seg);
+                    continue;
+                }
+
+                ScenicSpot anchor = anchorOpt.get();
+                double anchorCost = anchor.getDetour() + dwellTimePerStop;
+                if (globalSpent + anchorCost > totalTimeBudget) {
+                    log.info("  {}: seg={} anchor {} over budget (cost={}, remaining={})",
+                            passName, seg, anchor.getName(),
+                            String.format("%.1f", anchorCost),
+                            String.format("%.1f", totalTimeBudget - globalSpent));
+                    continue;
+                }
+
+                anchor.setSegmentIndex(seg);
                 if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                    ScenicSpot a = anchorOpt.get();
-                    a.setSelectionPhase("P0");
-                    String src = a.getSearchSource() != null ? a.getSearchSource() : "";
-                    a.setSelectionDebugCode("P0" + (src.isEmpty() ? "" : "/" + src));
+                    String phase = passName.contains("0") ? "P0" : passName.contains("1") ? "P1" : "P2";
+                    String src = anchor.getSearchSource() != null ? anchor.getSearchSource() : "";
+                    anchor.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
                 }
+                finalSelection.add(anchor);
+                selectedPlaceIds.add(anchor.getPlaceId());
+                segmentCount[seg]++;
+                segmentSpent[seg] += anchorCost;
+                log.info("  {}: seg={} anchor selected: {} (score={}, cost={}, source={})",
+                        passName, seg, anchor.getName(),
+                        String.format("%.1f", anchor.getScore()),
+                        String.format("%.1f", anchorCost),
+                        anchor.getSearchSource());
 
-                anchorBySegment.put(seg, anchorOpt.get());
-            }
-        }
+                // Cluster companions: KW first, then NB, then PO
+                List<java.util.function.Predicate<ScenicSpot>> companionTiers = List.of(isKW, isNB, isPO);
+                for (java.util.function.Predicate<ScenicSpot> tier : companionTiers) {
+                    List<ScenicSpot> tierCandidates = frozenSpots.stream()
+                            .filter(wp -> wp.getRating() >= 4.3)
+                            .filter(wp -> wp.getUserRatingsTotal() >= 500)
+                            .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                            .filter(wp -> haversineKm(anchor.getLat(), anchor.getLng(), wp.getLat(), wp.getLng()) <= 10.0)
+                            .filter(tier)
+                            .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
+                            .collect(Collectors.toList());
 
-// Step 2: Collect companion candidates within 10km of any anchor
-        Set<String> anchorPlaceIds = anchorBySegment.values().stream()
-                .map(ScenicSpot::getPlaceId)
-                .collect(Collectors.toSet());
+                    for (ScenicSpot companion : tierCandidates) {
+                        if (segmentCount[seg] >= 3) {
+                            break; // max 3 per segment
+                        }
+                        double gSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+                        if (gSpent >= totalTimeBudget) {
+                            break;
+                        }
+                        double companionCost = companion.getDetour() + dwellTimePerStop;
+                        if (gSpent + companionCost > totalTimeBudget) {
+                            continue;
+                        }
 
-        List<ScenicSpot> companionPool = new ArrayList<>();
-        Set<String> companionPlaceIds = new HashSet<>();
-
-        for (ScenicSpot anchor : anchorBySegment.values()) {
-            for (ScenicSpot wp : allFoundSpots) {
-                if (wp.getRating() < 4.3) {
-                    continue;
+                        companion.setSegmentIndex(seg);
+                        if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                            String phase = passName.contains("0") ? "P0c" : passName.contains("1") ? "P1c" : "P2c";
+                            String src = companion.getSearchSource() != null ? companion.getSearchSource() : "";
+                            companion.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
+                        }
+                        finalSelection.add(companion);
+                        selectedPlaceIds.add(companion.getPlaceId());
+                        segmentCount[seg]++;
+                        segmentSpent[seg] += companionCost;
+                        log.info("  {}: seg={} companion added: {} (score={}, cost={}, source={})",
+                                passName, seg, companion.getName(),
+                                String.format("%.1f", companion.getScore()),
+                                String.format("%.1f", companionCost),
+                                companion.getSearchSource());
+                    }
                 }
-                if (wp.getUserRatingsTotal() < 500) {
-                    continue;
-                }
-                if (anchorPlaceIds.contains(wp.getPlaceId())) {
-                    continue;
-                }
-                if (companionPlaceIds.contains(wp.getPlaceId())) {
-                    continue;
-                }
-                if (haversineKm(anchor.getLat(), anchor.getLng(), wp.getLat(), wp.getLng()) > 10.0) {
-                    continue;
-                }
-                if (hasStrictPrefs && !preferredGoogleTypes.contains(wp.getEntityType())) {
-                    continue;
-                }
-                wp.setSegmentIndex(anchor.getSegmentIndex());
-
-                if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                    wp.setSelectionPhase("P0c");
-                    String src = wp.getSearchSource() != null ? wp.getSearchSource() : "";
-                    wp.setSelectionDebugCode("P0c" + (src.isEmpty() ? "" : "/" + src));
-                }
-
-                companionPool.add(wp);
-                companionPlaceIds.add(wp.getPlaceId());
             }
-        }
+        };
 
-// Step 3: Build master pool — anchors + companions
-        List<ScenicSpot> masterPool = new ArrayList<>();
-        masterPool.addAll(anchorBySegment.values());
-        masterPool.addAll(companionPool);
+        // =================================================================
+        // PASS 0: KW anchors + (KW→NB→PO companions)
+        // =================================================================
+        runAnchorPass.accept("PASS 0 (KW anchors)", isKW);
 
-// Step 4: Score globally using rating * log(reviews)
-        for (ScenicSpot wp : masterPool) {
-            double score = wp.getRating() * Math.log(Math.max(1, wp.getUserRatingsTotal()));
-            wp.setScore(score);
-        }
+        // =================================================================
+        // PASS 1: NB anchors + (KW→NB→PO companions) for empty segments
+        // =================================================================
+        runAnchorPass.accept("PASS 1 (NB anchors)", isNB);
 
-// Step 5: Sort by score descending
-        masterPool.sort(Comparator.comparingDouble(ScenicSpot::getScore).reversed());
+        // =================================================================
+        // PASS 2: PO anchors + (KW→NB→PO companions) for still-empty segments
+        // =================================================================
+        runAnchorPass.accept("PASS 2 (PO anchors)", isPO);
 
-// Step 6: Select greedily respecting max per segment and budget
-        final int MAX_PER_SEGMENT = 3;
-        int[] segmentCount = new int[numSegments];
+        long pass2Count = finalSelection.size();
+        double pass2Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+        log.info("After Pass 0/1/2: {} waypoints selected, {}/{} mins budget used ({}%)",
+                pass2Count, String.format("%.1f", pass2Spent), String.format("%.1f", totalTimeBudget),
+                Math.round((pass2Spent / totalTimeBudget) * 100));
 
-        log.info("--- PASS 0: Global scoring selection ---");
-        for (ScenicSpot candidate : masterPool) {
-            if (pass0Remaining <= 0) {
-                break;
-            }
-            int seg = candidate.getSegmentIndex();
-            if (seg < 0 || seg >= numSegments) {
-                continue;
-            }
-            if (pass0PlaceIds.contains(candidate.getPlaceId())) {
-                continue;
-            }
-            if (segmentCount[seg] >= MAX_PER_SEGMENT) {
-                continue;
-            }
+        // =================================================================
+        // PASS 3: Budget diffusion — KW exhausted first, then NB, then PO
+        // =================================================================
+        log.info("--- PASS 3: Budget diffusion ---");
 
-            double cost = candidate.getDetour() + dwellTimePerStop;
-            if (cost > pass0Remaining) {
-                log.info("  Skipped {}: over budget (cost={}, remaining={})",
-                        candidate.getName(),
-                        String.format("%.1f", cost),
-                        String.format("%.1f", pass0Remaining));
-                continue;
-            }
-
-            pass0Selections.add(candidate);
-            pass0PlaceIds.add(candidate.getPlaceId());
-            segmentCount[seg]++;
-            pass0Remaining -= cost;
-            log.info("  Selected seg={}: {} (score={}, rating={}, reviews={}, cost={})",
-                    seg, candidate.getName(),
-                    String.format("%.1f", candidate.getScore()),
-                    candidate.getRating(),
-                    candidate.getUserRatingsTotal(),
-                    String.format("%.1f", cost));
-        }
-
-// Step 7: Fill empty segments with lower-threshold candidates
-        log.info("--- PASS 0d: Empty segment fill ---");
-        for (int i = 0; i < numSegments; i++) {
-            if (pass0Remaining <= 0) {
-                break;
-            }
-            if (segmentCount[i] > 0) {
-                continue;
-            }
-            final int seg = i;
-
-            Optional<ScenicSpot> bestOpt = allFoundSpots.stream()
-                    .filter(wp -> wp.getRating() >= 4.5)
-                    .filter(wp -> wp.getUserRatingsTotal() >= 100)
-                    .filter(wp -> !pass0PlaceIds.contains(wp.getPlaceId()))
-                    .filter(wp -> !hasStrictPrefs || preferredGoogleTypes.contains(wp.getEntityType()))
-                    .filter(wp -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg)
-                    .max(Comparator.comparingInt(ScenicSpot::getUserRatingsTotal));
-
-            if (bestOpt.isPresent()) {
-                ScenicSpot best = bestOpt.get();
-                double cost = best.getDetour() + dwellTimePerStop;
-                if (cost <= pass0Remaining) {
-                    best.setSegmentIndex(seg);
-                    pass0Selections.add(best);
-                    pass0PlaceIds.add(best.getPlaceId());
-                    segmentCount[seg]++;
-                    pass0Remaining -= cost;
-                    log.info("  Filled seg={}: {} (rating={}, reviews={}, cost={})",
-                            seg, best.getName(), best.getRating(),
-                            best.getUserRatingsTotal(), String.format("%.1f", cost));
-                } else {
-                    log.info("  seg={}: {} skipped — over budget (cost={}, remaining={})",
-                            seg, best.getName(),
-                            String.format("%.1f", cost),
-                            String.format("%.1f", pass0Remaining));
-                }
-            } else {
-                log.info("  seg={}: no qualifying anchor found", seg);
-            }
-        }
-
-// Step 8: Remove Pass 0 selections from candidate pool
-        allFoundSpots = allFoundSpots.stream()
-                .filter(wp -> !pass0PlaceIds.contains(wp.getPlaceId()))
+        // Build remaining candidates by source tier
+        List<ScenicSpot> remainingKW = allFoundSpots.stream()
+                .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                .filter(isKW)
+                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
+                .collect(Collectors.toList());
+        List<ScenicSpot> remainingNB = allFoundSpots.stream()
+                .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                .filter(isNB)
+                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
+                .collect(Collectors.toList());
+        List<ScenicSpot> remainingPO = allFoundSpots.stream()
+                .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                .filter(isPO)
+                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
                 .collect(Collectors.toList());
 
-// Step 9: Deduct Pass 0 budget and pre-populate segmentSpent
-        double pass0BudgetUsed = totalTimeBudget - pass0Remaining;
-        totalTimeBudget = pass0Remaining;
-        finalSelection.addAll(pass0Selections);
+        List<ScenicSpot> diffusionPool = new ArrayList<>();
+        diffusionPool.addAll(remainingKW);
+        diffusionPool.addAll(remainingNB);
+        diffusionPool.addAll(remainingPO);
 
-        for (ScenicSpot spot : pass0Selections) {
-            int seg = spot.getSegmentIndex();
-            if (seg >= 0 && seg < numSegments) {
-                segmentSpent[seg] += spot.getDetour() + dwellTimePerStop;
-            }
-        }
-
-        log.info("--- PASS 0 COMPLETE: {} spots selected, {} mins used, {} mins remaining ---",
-                pass0Selections.size(),
-                String.format("%.1f", pass0BudgetUsed),
-                String.format("%.1f", totalTimeBudget));
-
-        // Group candidates by segment, sorted by score descending
-        Map<Integer, List<ScenicSpot>> bySegment = new HashMap<>();
-
-        for (int i = 0; i < numSegments; i++) {
-            bySegment.put(i, new ArrayList<>());
-        }
-        for (ScenicSpot spot : allFoundSpots) {
-            int seg = Math.min((int) (spot.getDistFromStart() / segmentLength), numSegments - 1);
-            spot.setSegmentIndex(seg);
-            bySegment.get(seg).add(spot);
-            bySegment.get(seg).sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
-        }
-
-        // Cap candidates per segment to prevent dense urban segments monopolizing selection
-        for (int i = 0; i < numSegments; i++) {
-            List<ScenicSpot> segCandidates = bySegment.get(i);
-            if (segCandidates.size() > MAX_CANDIDATES_PER_SEGMENT) {
-                bySegment.put(i, new ArrayList<>(segCandidates.subList(0, MAX_CANDIDATES_PER_SEGMENT)));
-                log.info("  Segment {}: trimmed from {} to {} candidates (density cap)",
-                        i, segCandidates.size(), MAX_CANDIDATES_PER_SEGMENT);
-            }
-        }
-
-        for (int i = 0; i < numSegments; i++) {
-            log.info("  Segment {}: [{} km - {} km] — {} candidates",
-                    i,
-                    String.format("%.1f", i * segmentLength),
-                    String.format("%.1f", (i + 1) * segmentLength),
-                    bySegment.get(i).size());
-        }
-
-        // Pre-populate segmentSpent with Pass 0 costs before Pass 1
-        for (ScenicSpot spot : pass0Selections) {
-            int seg = spot.getSegmentIndex();
-            if (seg >= 0 && seg < numSegments) {
-                segmentSpent[seg] += spot.getDetour() + dwellTimePerStop;
-            }
-        }
-
-        // --- Pass 1: Initial per-segment selection ---
-        log.info(
-                "--- PASS 1: Initial per-segment selection ---");
-        for (int seg = 0; seg < numSegments; seg++) {
+        for (ScenicSpot candidate : diffusionPool) {
             double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
             if (globalSpent >= totalTimeBudget) {
                 break;
             }
-
-            double effectiveBudget = Math.min(segmentBudget[seg], totalTimeBudget - globalSpent);
-            final int currentSeg = seg;
-
-            segmentSpent[seg] = runSegmentSelection(
-                    seg, bySegment.get(seg), effectiveBudget,
-                    finalSelection, dwellTimePerStop, segmentSpent[seg], totalPathLength, "P1");
-
-            log.info("  Segment {}: consumed={} mins, unspent={} mins, waypoints selected={}",
-                    seg,
-                    String.format("%.1f", segmentSpent[seg]),
-                    String.format("%.1f", segmentBudget[seg] - segmentSpent[seg]),
-                    finalSelection.stream().filter(s -> s.getSegmentIndex() == currentSeg).count());
-        }
-
-        long pass1Count = finalSelection.size();
-        double pass1Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-
-        log.info(
-                "Pass 1 complete: {} waypoints selected, {}/{} mins budget used ({}%)",
-                pass1Count,
-                String.format("%.1f", pass1Spent),
-                String.format("%.1f", totalTimeBudget),
-                Math.round((pass1Spent / totalTimeBudget) * 100));
-
-        // --- Pass 2: Budget diffusion ---
-        log.info(
-                "--- PASS 2: Budget diffusion ---");
-        boolean anyDiffused = true;
-        int diffusionRound = 0;
-        Set<Integer> exhaustedSources = new HashSet<>();
-
-        while (anyDiffused) {
-            anyDiffused = false;
-            diffusionRound++;
-
-            if (diffusionRound > numSegments * 2) {
-                log.warn("Diffusion round limit reached ({}) — breaking to prevent infinite loop", diffusionRound);
+            if (finalSelection.size() >= 23) {
                 break;
             }
-
-            log.info("  Diffusion round {}:", diffusionRound);
-
-            List<Integer> diffusionSources = new ArrayList<>();
-            for (int seg = 0; seg < numSegments; seg++) {
-                if (exhaustedSources.contains(seg)) {
-                    continue;
-                }
-                double unspent = segmentBudget[seg] - segmentSpent[seg];
-                if (unspent <= 0) {
-                    continue;
-                }
-                if (segmentSpent[seg] == 0) {
-                    diffusionSources.add(0, seg);
-                    log.info("    Queued segment {} as EMPTY source ({} mins unspent)", seg, String.format("%.1f", unspent));
-                } else {
-                    diffusionSources.add(seg);
-                    log.info("    Queued segment {} as PARTIAL source ({} mins unspent)", seg, String.format("%.1f", unspent));
-                }
+            if (selectedPlaceIds.contains(candidate.getPlaceId())) {
+                continue;
             }
 
-            if (diffusionSources.isEmpty()) {
-                log.info("  No segments with unspent budget — diffusion complete");
-                break;
+            int seg = Math.min((int) (candidate.getDistFromStart() / segmentLength), numSegments - 1);
+            if (segmentCount[seg] >= 3) {
+                continue;
             }
 
-            for (int source : diffusionSources) {
-                double unspent = segmentBudget[source] - segmentSpent[source];
-                if (unspent <= 0) {
-                    continue;
-                }
-
-                log.info("    Diffusing from segment {} ({} mins unspent):", source, String.format("%.1f", unspent));
-
-                int maxRadius = numSegments - 1;
-                boolean sourceDiffused = false;
-
-                for (int radius = 1; radius <= maxRadius; radius++) {
-                    double consumedAtRadius = 0;
-
-                    for (int neighbor : new int[]{source - radius, source + radius}) {
-                        if (neighbor < 0 || neighbor >= numSegments) {
-                            continue;
-                        }
-                        final int currentNeighbor = neighbor;
-
-                        double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-                        if (globalSpent >= totalTimeBudget) {
-                            break;
-                        }
-
-                        double allocating = unspent;
-                        segmentBudget[neighbor] += allocating;
-                        double effectiveBudget = Math.min(segmentBudget[neighbor], totalTimeBudget - globalSpent);
-
-                        log.info("        Segment {}: allocating {} mins (budget now {})",
-                                neighbor, String.format("%.1f", allocating), String.format("%.1f", segmentBudget[neighbor]));
-
-                        double before = segmentSpent[neighbor];
-                        segmentSpent[neighbor] = runSegmentSelection(
-                                neighbor, bySegment.get(neighbor), effectiveBudget,
-                                finalSelection, dwellTimePerStop, segmentSpent[neighbor], totalPathLength, "P2");
-
-                        double consumed = segmentSpent[neighbor] - before;
-                        consumedAtRadius += consumed;
-
-                        if (consumed > 0) {
-                            double unclaimed = allocating - consumed;
-                            segmentBudget[neighbor] -= unclaimed;
-                            unspent -= consumed;
-                            anyDiffused = true;
-                            sourceDiffused = true;
-                            log.info("        Segment {}: consumed {} mins, reclaimed {} mins — now has {} waypoints",
-                                    neighbor, String.format("%.1f", consumed), String.format("%.1f", unclaimed),
-                                    finalSelection.stream().filter(s -> s.getSegmentIndex() == currentNeighbor).count());
-                        } else {
-                            segmentBudget[neighbor] -= allocating;
-                            log.info("        Segment {}: consumed nothing — budget fully reclaimed", neighbor);
-                        }
-                    }
-
-                    if (consumedAtRadius == 0) {
-                        log.info("      Radius {} yielded nothing — expanding to radius {}", radius, radius + 1);
-                    } else {
-                        segmentSpent[source] = Math.min(segmentBudget[source], segmentSpent[source] + consumedAtRadius);
-                        log.info("      Radius {} consumed {} mins — stopping diffusion from segment {}",
-                                radius, String.format("%.1f", consumedAtRadius), source);
-                        break;
-                    }
-                }
-
-                if (!sourceDiffused) {
-                    exhaustedSources.add(source);
-                    log.info("    Segment {}: no neighbors absorbed budget at any radius — marked as exhausted", source);
-                }
+            double cost = candidate.getDetour() + dwellTimePerStop;
+            if (globalSpent + cost > totalTimeBudget) {
+                continue;
             }
+
+            if (!isSpaceAvailable(finalSelection, candidate, totalPathLength)) {
+                log.info("  Pass 3: skipped (too close): {}", candidate.getName());
+                continue;
+            }
+
+            candidate.setSegmentIndex(seg);
+            if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                String src = candidate.getSearchSource() != null ? candidate.getSearchSource() : "";
+                candidate.setSelectionDebugCode("P3" + (src.isEmpty() ? "" : "/" + src));
+            }
+            finalSelection.add(candidate);
+            selectedPlaceIds.add(candidate.getPlaceId());
+            segmentCount[seg]++;
+            segmentSpent[seg] += cost;
+            log.info("  Pass 3: added: {} (score={}, cost={}, source={})",
+                    candidate.getName(),
+                    String.format("%.1f", candidate.getScore()),
+                    String.format("%.1f", cost),
+                    candidate.getSearchSource());
         }
 
         double finalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-
-        log.info(
-                "=== ESCALATED SELECTION COMPLETE ===");
-        log.info(
-                "Waypoints: {} selected | Actual time cost: {}/{} mins ({}%) | Diffusion added: {}",
+        log.info("=== ESCALATED SELECTION COMPLETE ===");
+        log.info("Waypoints: {} selected | Actual time cost: {}/{} mins ({}%) | Diffusion added: {}",
                 finalSelection.size(),
                 String.format("%.1f", finalSpent),
                 String.format("%.1f", totalTimeBudget),
                 Math.round((finalSpent / totalTimeBudget) * 100),
-                finalSelection.size() - pass1Count);
+                finalSelection.size() - pass2Count);
 
         for (int seg = 0; seg < numSegments; seg++) {
             final int currentSeg = seg;
@@ -1046,6 +863,23 @@ public class RouteBeautifierService {
                     finalSelection.stream().filter(s -> s.getSegmentIndex() == currentSeg).count(),
                     String.format("%.1f", segmentSpent[seg]),
                     String.format("%.1f", segmentBudget[seg]));
+        }
+
+        // Corridor filter
+        if (routeCoords != null && !routeCoords.isEmpty()) {
+            double MAX_CORRIDOR_KM = 35.0;
+            List<ScenicSpot> filtered = finalSelection.stream()
+                    .filter(spot -> {
+                        double dist = minDistanceFromPathKm(spot.getLat(), spot.getLng(), routeCoords);
+                        if (dist > MAX_CORRIDOR_KM) {
+                            log.info("Corridor filter rejected: {} ({}km off route)", spot.getName(), String.format("%.1f", dist));
+                            return false;
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
+            finalSelection.clear();
+            finalSelection.addAll(filtered);
         }
 
         finalSelection.sort(Comparator.comparingDouble(ScenicSpot::getDistFromStart));
@@ -1177,7 +1011,7 @@ public class RouteBeautifierService {
 
                 int added = searchAndCollect(p1.lat, p1.lng, adaptiveRadius,
                         nearbyTypes, keywordTypes, "NB", "KW",
-                        odometer, totalDist, routeEnhancementThreshold, dest,
+                        odometer, totalDist, routeEnhancementThreshold, dest, path,
                         seenPlaceIds, rawGoogleSpots);
                 zoneResultCounts.merge(zoneIndex, added, Integer::sum);
             }
@@ -1207,7 +1041,7 @@ public class RouteBeautifierService {
 
                     int added = searchAndCollect(p1.lat, p1.lng, wideRadius,
                             nearbyTypes, keywordTypes, "NB-WR", "KW-WR",
-                            odometer, totalDist, routeEnhancementThreshold, dest,
+                            odometer, totalDist, routeEnhancementThreshold, dest, path,
                             seenPlaceIds, rawGoogleSpots);
                     zoneResultCounts.merge(zoneIndex, added, Integer::sum);
                 }
@@ -1233,7 +1067,7 @@ public class RouteBeautifierService {
                 }
                 seenPlaceIds.add(spot.getPlaceId());
                 spot.setDistFromStart(totalDist);
-                spot.setScore(calculateScore(spot, dest, totalDist, routeEnhancementThreshold, dest));
+                spot.setScore(calculateScore(spot, path, totalDist, 10.0, dest));
                 rawGoogleSpots.add(spot);
             }
         }
@@ -1253,6 +1087,7 @@ public class RouteBeautifierService {
             c.setEntityType(s.getEntityType());
             c.setOpeningHoursJson(s.getOpeningHoursJson());
             c.setSelectionDebugCode(s.getSearchSource());
+            c.setSearchSource(s.getSearchSource());
             return c;
         }).collect(Collectors.toList());
 
@@ -1298,6 +1133,7 @@ public class RouteBeautifierService {
                 spot.setEntityType(sw.getEntityType());
                 spot.setDistFromStart(sw.getDistFromStart() != null ? sw.getDistFromStart() : 0.0);
                 spot.setSelectionDebugCode(sw.getSelectionDebugCode());
+                spot.setSearchSource(sw.getSearchSource());
                 candidates.add(spot);
             }
         }
@@ -1311,7 +1147,7 @@ public class RouteBeautifierService {
             double lat, double lng, int searchRadius,
             List<String> nearbyTypes, List<String> keywordTypes,
             String nearbyTag, String keywordTag,
-            double odometer, double totalDist, double routeEnhancementThreshold, LatLng dest,
+            double odometer, double totalDist, double routeEnhancementThreshold, LatLng dest, List<LatLng> path,
             Set<String> seenPlaceIds, List<ScenicSpot> rawGoogleSpots) {
 
         // Fetch nearby and keyword results
@@ -1355,7 +1191,23 @@ public class RouteBeautifierService {
             }
             seenPlaceIds.add(spot.getPlaceId());
             spot.setDistFromStart(odometer);
-            spot.setScore(calculateScore(spot, p1, totalDist, routeEnhancementThreshold, dest));
+
+            // Source bonus — prioritizes user-selected types over fill candidates
+            double sourceBonus = 0;
+            if (spot.getSearchSource() != null) {
+                sourceBonus = switch (spot.getSearchSource()) {
+                    case "KW", "KW-WR" ->
+                        30.0;
+                    case "NB", "NB-WR" ->
+                        20.0;
+                    case "NB-DEST" ->
+                        10.0;
+                    default ->
+                        0.0;
+                };
+            }
+
+            spot.setScore(calculateScore(spot, path, totalDist, sourceBonus, dest));
             rawGoogleSpots.add(spot);
             if (DebugConfig.SHOW_SELECTION_DEBUG) {
                 log.info("Qualified spot: {} at {},{} distFromStart={}km source={}",
@@ -1368,31 +1220,27 @@ public class RouteBeautifierService {
     }
 
     private double calculateScore(
-            ScenicSpot spot,
-            LatLng roadPoint,
-            double totalDist,
-            double routeEnhancementThreshold,
-            LatLng dest
-    ) {
-        double detourDistanceKm = haversine(roadPoint.lat, roadPoint.lng, spot.getLat(), spot.getLng());
-        int estimatedDetourMins = (int) ((detourDistanceKm * 2.0 / 80.0) * 60.0);
+            ScenicSpot spot, List<LatLng> path, double totalDist, double sourceBonus, LatLng dest) {
+
+// Find nearest path point for accurate detour calculation
+        double minDistKm = Double.MAX_VALUE;
+        for (LatLng point : path) {
+            double d = haversineKm(spot.getLat(), spot.getLng(), point.lat, point.lng);
+            if (d < minDistKm) {
+                minDistKm = d;
+            }
+        }
+
+        int estimatedDetourMins = (int) ((minDistKm * 2.0 / 80.0) * 60.0);
         spot.setDetour(estimatedDetourMins);
 
-        // Rating component: 0-60 pts. A 5★ place scores 60, a 2.5★ scores 0.
         double baseRating = spot.getRating() > 0 ? spot.getRating() : 2.5;
         double ratingScore = Math.max(0, (baseRating - 2.5) / 2.5 * 60.0);
-
-        // Popularity component: 0-30 pts. log scale — 10 reviews ≈ 10pts, 1000 ≈ 20pts, 100k ≈ 30pts.
         double popularityScore = Math.min(30.0, Math.log10(spot.getUserRatingsTotal() + 1) / Math.log10(100000) * 30.0);
-
-        // Arrival bonus: 0-5 pts. Slightly favors stops further along the route.
-        double distToDest = haversine(spot.getLat(), spot.getLng(), dest.lat, dest.lng);
+        double distToDest = haversineKm(spot.getLat(), spot.getLng(), dest.lat, dest.lng);
         double arrivalBonus = (1.0 - (distToDest / totalDist)) * 5.0;
-
-        // Detour penalty: mild, 0.2 pts per minute. A 15-min detour costs 3 pts.
         double detourPenalty = estimatedDetourMins * 0.2;
-
-        double score = ratingScore + popularityScore + arrivalBonus - detourPenalty;
+        double score = ratingScore + popularityScore + arrivalBonus + sourceBonus - detourPenalty;
         return Math.max(0, score);
     }
 
@@ -1483,6 +1331,17 @@ public class RouteBeautifierService {
         }
 
         return url.toString();
+    }
+
+    private double minDistanceFromPathKm(double lat, double lng, List<CoordinateDto> path) {
+        double minDist = Double.MAX_VALUE;
+        for (CoordinateDto point : path) {
+            double d = haversineKm(lat, lng, point.getLat(), point.getLng());
+            if (d < minDist) {
+                minDist = d;
+            }
+        }
+        return minDist;
     }
 
     /**

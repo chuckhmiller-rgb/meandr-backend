@@ -29,21 +29,36 @@ public class ScenicSpot {
     private String entityType;  // Google Places type string or OsmEntityType.name()
     private String openingHoursJson;
     private int segmentIndex;
+    
+    /**
+     * Tracks how and when this place was found and selected during route
+     * beautification.
+     *
+     * SELECTION STRATEGY — four-pass priority hierarchy: Pass 0: Find best KW
+     * anchor per segment (rating >= 4.5, reviews >= 100), then cluster KW → NB
+     * → PO companions within 10km. Pass 1: For segments still empty after Pass
+     * 0, find best NB anchor (rating >= 4.5, reviews >= 1000), then cluster KW
+     * → NB → PO companions. Pass 2: For segments still empty after Pass 1, find
+     * best PO anchor (rating >= 4.5, reviews >= 1000), then cluster KW → NB →
+     * PO companions. Pass 3: Diffuse remaining budget — exhaust KW spots first
+     * across all segments, then NB, then PO.
+     *
+     * searchSource — always populated, indicates which search method found this
+     * place: "NB" = found via searchNearby (standard radius) "KW" = found via
+     * searchText keyword (standard radius) "NB-WR" = found via searchNearby
+     * wide radius retry "KW-WR" = found via searchText keyword wide radius
+     * retry "NB-DEST" = found via searchNearby destination wide search
+     *
+     * selectionDebugCode — only populated when DebugConfig.SHOW_SELECTION_DEBUG
+     * = true. Combines selection pass and search source, e.g.: "P0/KW" = Pass 0
+     * KW anchor "P0c/NB" = Pass 0 companion, found via nearby search "P1/NB" =
+     * Pass 1 NB anchor "P1c/KW" = Pass 1 companion, found via keyword search
+     * "P2/NB-WR" = Pass 2 PO anchor, found via wide radius nearby "P3/KW" =
+     * Pass 3 diffusion, found via keyword search
+     */
     private String selectionPhase; // "P0", "P0c", "P1", "P2" label coded prefix for ease of test validation
     private String searchSource;   // "NB", "KW" label coded prefix for ease of test validation
-    /**
-     * Debug code for selection phase and search source tracking. Only populated
-     * when DebugConfig.SHOW_SELECTION_DEBUG = true. Format: "[phase/source]"
-     * e.g.: "NB" = found via searchNearby "KW" = found via searchText keyword
-     * "NB-WR" = found via searchNearby wide radius retry "KW-WR" = found via
-     * searchText keyword wide radius retry "P0/NB" = Pass 0 anchor, found via
-     * searchNearby "P0c/KW" = Pass 0 companion, found via keyword search
-     * "P1/NB" = Pass 1 selection, found via searchNearby "P2/KW" = Pass 2
-     * diffusion, found via keyword search
-     */
     private String selectionDebugCode;
-    
-    
 
     // 3. THE COPY CONSTRUCTOR 
     public ScenicSpot(ScenicSpot other) {
@@ -60,8 +75,8 @@ public class ScenicSpot {
         this.entityType = other.entityType;
         this.openNow = other.openNow;
         this.businessStatus = other.businessStatus;
-        this.openingHoursJson = other.openingHoursJson; 
-        this.segmentIndex = other.segmentIndex;         
+        this.openingHoursJson = other.openingHoursJson;
+        this.segmentIndex = other.segmentIndex;
         this.selectionPhase = other.selectionPhase;
         this.selectionDebugCode = other.selectionDebugCode;
 
