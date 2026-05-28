@@ -1169,10 +1169,13 @@ public class RouteBeautifierService {
                 : googleProxy.searchNearbyScenic(lat, lng, searchRadius, nearbyTypes);
 
         List<ScenicSpot> keywordResults = new ArrayList<>();
+        Map<String, String> placeIdToKeyword = new HashMap<>();
         for (String entityType : keywordTypes) {
-            String keyword = GoogleApiProxyController.ENTITY_KEYWORDS.get(entityType);
+            String kw = GoogleApiProxyController.ENTITY_KEYWORDS.get(entityType);
             List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(List.of(entityType));
-            keywordResults.addAll(googleProxy.searchTextScenic(lat, lng, searchRadius, keyword, googleTypes));
+            List<ScenicSpot> kwSpots = googleProxy.searchTextScenic(lat, lng, searchRadius, kw, googleTypes);
+            kwSpots.forEach(s -> placeIdToKeyword.put(s.getPlaceId(), kw));
+            keywordResults.addAll(kwSpots);
         }
 
         // Tag debug source before merging
@@ -1186,6 +1189,26 @@ public class RouteBeautifierService {
         double searchRadiusKm = searchRadius / 1000.0;
         List<ScenicSpot> allNearby = Stream.concat(nearbyResults.stream(), keywordResults.stream())
                 .filter(spot -> haversineKm(spot.getLat(), spot.getLng(), lat, lng) <= searchRadiusKm)
+                .collect(Collectors.toList());
+
+        // Post-filter keyword results by name — reject if none of the keyword terms
+        // appear in the place name (guards against Google searchText fuzzy matching)
+        allNearby = allNearby.stream()
+                .filter(spot -> {
+                    String kw = placeIdToKeyword.get(spot.getPlaceId());
+                    if (kw == null) {
+                        return true; // not a keyword result, keep it
+                    }
+                    String[] terms = kw.toLowerCase().split("\\s+");
+                    String nameLower = spot.getName().toLowerCase();
+                    for (String term : terms) {
+                        if (nameLower.contains(term)) {
+                            return true;
+                        }
+                    }
+                    log.debug("Keyword name filter rejected: {} (keyword={})", spot.getName(), kw);
+                    return false;
+                })
                 .collect(Collectors.toList());
 
         // Filter, score and collect qualified spots
