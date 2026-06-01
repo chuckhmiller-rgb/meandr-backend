@@ -14,6 +14,7 @@ com/meandr/meandrDataServices/dto/UsersResponseDto$UsersResponseDtoBuilder.class
 com/meandr/meandrDataServices/service/RouteBeautifierService$LatLng.class
 com/meandr/meandrDataServices/util/Patcher.class
 com/meandr/meandrDataServices/controller/UsersController.class
+com/meandr/meandrDataServices/model/WaypointPhoto.class
 com/meandr/meandrDataServices/MeandrDataServices.class
 com/meandr/meandrDataServices/service/EntityPreferenceService.class
 com/meandr/meandrDataServices/model/RouteStop.class
@@ -40,6 +41,7 @@ com/meandr/meandrDataServices/controller/DebugVisualizerController.class
 com/meandr/meandrDataServices/dto/PlaceSearchRequestDto.class
 com/meandr/meandrDataServices/util/PolylineUtils.class
 com/meandr/meandrDataServices/service/MapBoxRoutingService.class
+com/meandr/meandrDataServices/model/WaypointPhoto$WaypointPhotoBuilder.class
 com/meandr/meandrDataServices/model/ScenicSpot.class
 com/meandr/meandrDataServices/dto/SaveRouteRequestDto.class
 com/meandr/meandrDataServices/service/RouteBeautifierService.class
@@ -55,6 +57,8 @@ com/meandr/meandrDataServices/dto/RerouteRequestDto$WaypointDto.class
 com/meandr/meandrDataServices/preferences/PreferenceTier.class
 com/meandr/meandrDataServices/service/UserRouteService.class
 com/meandr/meandrDataServices/dto/UsersRegistrationDto.class
+com/meandr/meandrDataServices/dto/WaypointPhotoDto$WaypointPhotoDtoBuilder.class
+com/meandr/meandrDataServices/controller/WaypointPhotoController.class
 com/meandr/meandrDataServices/service/UsersService.class
 com/meandr/meandrDataServices/controller/UserRouteController.class
 com/meandr/meandrDataServices/model/UserStatus.class
@@ -76,7 +80,9 @@ com/meandr/meandrDataServices/controller/AuthController.class
 com/meandr/meandrDataServices/security/JwtFilter.class
 com/meandr/meandrDataServices/dto/ClimbingGymResponseDto$ClimbingGymResponseDtoBuilder.class
 com/meandr/meandrDataServices/dto/UserRouteSummaryDto.class
+com/meandr/meandrDataServices/repository/WaypointPhotoRepository.class
 com/meandr/meandrDataServices/repository/UserRouteRepository.class
+com/meandr/meandrDataServices/dto/WaypointPhotoDto.class
 com/meandr/meandrDataServices/dto/RouteStepDetailDto.class
 com/meandr/meandrDataServices/ServletInitializer.class
 com/meandr/meandrDataServices/preferences/EntityCategory.class

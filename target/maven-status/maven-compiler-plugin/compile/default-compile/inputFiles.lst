@@ -17,6 +17,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/controller/UserRouteController.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/controller/UsersController.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/controller/VisualizerController.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/controller/WaypointPhotoController.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/BeautifiedRouteResponseDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/BeautifyRequestDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/ClimbingGymResponseDto.java
@@ -34,6 +35,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UsersRegistrationDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UsersResponseDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/UsersUpdateDto.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/dto/WaypointPhotoDto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/exception/GlobalExceptionHandler.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/exception/RouteNotFoundException.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/mapper/UsersFieldUpdateMapper.java
@@ -46,6 +48,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/UserRoute.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/UserStatus.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/Users.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/model/WaypointPhoto.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/osm/controller/OsmController.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/osm/model/OsmEntityType.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/osm/model/OsmPlace.java
@@ -59,6 +62,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/ParkRepository.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/UserRouteRepository.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/UsersRepository.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/repository/WaypointPhotoRepository.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/scheduler/RouteCleanupScheduler.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/scoring/GooglePlaceCandidate.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/scoring/ScoredWaypoint.java

@@ -34,9 +34,11 @@ public class SecurityConfig {
                         "/api/v1/users/register",
                         "/api/v1/auth/login",
                         "/api/v1/route/**",
+                        "/api/v1/waypoint-photos/**",
                         "/api/v1/maps/**",
                         "/api/v1/osm/**",
                         "/api/places/**",
+                        "/api/v1/waypoint-photos/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/swagger-resources/**",
@@ -66,12 +68,12 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(List.of(
-                "http://localhost:5173", // your local Vite/React dev server
-                "https://meandr.app", // your production domain
-                "https://meandr-app.vercel.app", // ← ADD THIS (Vercel preview/production)
+                "http://localhost:5173",
+                "https://meandr.app",
+                "https://meandr-app.vercel.app",
+                "https://miss-proarmy-nonfraternally.ngrok-free.dev", 
                 "http://localhost:3000",
-                "http://127.0.0.1:5173",
-                "http://localhost:5173"
+                "http://127.0.0.1:5173"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
