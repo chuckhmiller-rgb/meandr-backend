@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -80,8 +81,10 @@ public class WaypointPhotoController {
     }
 
     @GetMapping("/{placeId}")
-    public ResponseEntity<?> getPhotos(@PathVariable String placeId) {
-        List<WaypointPhoto> photos = waypointPhotoRepository.findByPlaceId(placeId);
+    public ResponseEntity<?> getPhotos(@PathVariable String placeId, @RequestParam(required = false) Long userId) {
+        List<WaypointPhoto> photos = userId != null
+                ? waypointPhotoRepository.findByPlaceIdAndUserId(placeId, userId)
+                : waypointPhotoRepository.findByPlaceId(placeId);
         List<Map<String, Object>> result = photos.stream().map(p -> {
             Map<String, Object> m = new HashMap<>();
             m.put("id", p.getId());
@@ -113,8 +116,11 @@ public class WaypointPhotoController {
     }
 
     @GetMapping("/count/{placeId}")
-    public ResponseEntity<?> countPhotos(@PathVariable String placeId) {
-        long count = waypointPhotoRepository.countByPlaceId(placeId);
+    public ResponseEntity<?> countPhotos(@PathVariable String placeId, @RequestParam(required = false) Long userId) {
+        //long count = waypointPhotoRepository.countByPlaceId(placeId);
+        long count = userId != null
+                ? waypointPhotoRepository.countByPlaceIdAndUserId(placeId, userId)
+                : waypointPhotoRepository.countByPlaceId(placeId);
         return ResponseEntity.ok(Map.of("count", count));
     }
 }

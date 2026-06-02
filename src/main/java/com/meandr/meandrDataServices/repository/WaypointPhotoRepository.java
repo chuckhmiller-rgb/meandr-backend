@@ -8,4 +8,6 @@ public interface WaypointPhotoRepository extends JpaRepository<WaypointPhoto, Lo
     List<WaypointPhoto> findByPlaceId(String placeId);
     List<WaypointPhoto> findByRouteId(Long routeId);
     long countByPlaceId(String placeId);
+    long countByPlaceIdAndUserId(String placeId, Long userId);
+    List<WaypointPhoto> findByPlaceIdAndUserId(String placeId, Long userId);
 }
