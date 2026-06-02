@@ -1,4 +1,4 @@
-2026-06-01T01:26:06.279-04:00 ERROR 75525 --- [http-nio-8080-exec-6] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
+2026-06-02T01:05:15.565-04:00 ERROR 75525 --- [http-nio-8080-exec-21] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
 
 org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico.
 	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:585) ~[spring-webmvc-6.2.15.jar:6.2.15]
@@ -100,7 +100,7 @@ org.springframework.web.servlet.resource.NoResourceFoundException: No static res
 	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
 	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
 
-2026-06-01T01:59:59.973-04:00 ERROR 75525 --- [scheduling-1] o.s.s.s.TaskUtils$LoggingErrorHandler    : Unexpected error occurred in scheduled task
+2026-06-02T02:00:00.017-04:00 ERROR 75525 --- [scheduling-1] o.s.s.s.TaskUtils$LoggingErrorHandler    : Unexpected error occurred in scheduled task
 
 org.springframework.dao.InvalidDataAccessApiUsageException: Executing an update/delete query
 	at org.springframework.orm.jpa.EntityManagerFactoryUtils.convertJpaAccessExceptionIfPossible(EntityManagerFactoryUtils.java:400) ~[spring-orm-6.2.15.jar:6.2.15]
@@ -154,22 +154,7 @@ Caused by: jakarta.persistence.TransactionRequiredException: Executing an update
 	at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:138) ~[spring-tx-6.2.15.jar:6.2.15]
 	... 21 common frames omitted
 
-2026-06-01T03:21:18.863-04:00  INFO 75525 --- [http-nio-8080-exec-6] o.apache.coyote.http11.Http11Processor   : Error parsing HTTP request header
- Note: further occurrences of HTTP request parsing errors will be logged at DEBUG level.
-
-java.lang.IllegalArgumentException: Invalid character found in method name [0x050x020x000x02...]. HTTP method names must be tokens
-	at org.apache.coyote.http11.Http11InputBuffer.parseRequestLine(Http11InputBuffer.java:402) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:272) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:903) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1774) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
-
-2026-06-01T05:24:50.038-04:00 ERROR 75525 --- [http-nio-8080-exec-1] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
+2026-06-02T02:49:26.912-04:00 ERROR 75525 --- [http-nio-8080-exec-6] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
 
 org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico.
 	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:585) ~[spring-webmvc-6.2.15.jar:6.2.15]
@@ -271,57 +256,7 @@ org.springframework.web.servlet.resource.NoResourceFoundException: No static res
 	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
 	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
 
-2026-06-01T08:24:11.566-04:00  INFO 75525 --- [http-nio-8080-exec-9] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=390040
-2026-06-01T08:48:16.474-04:00 ERROR 75525 --- [http-nio-8080-Acceptor] org.apache.tomcat.util.net.NioEndpoint   : Error setting socket options
-
-java.net.SocketException: Invalid argument
-	at java.base/sun.nio.ch.Net.setIntOption0(Native Method) ~[na:na]
-	at java.base/sun.nio.ch.Net.setSocketOption(Net.java:403) ~[na:na]
-	at java.base/sun.nio.ch.Net.setSocketOption(Net.java:341) ~[na:na]
-	at java.base/sun.nio.ch.SocketChannelImpl.setOption(SocketChannelImpl.java:285) ~[na:na]
-	at java.base/sun.nio.ch.SocketAdaptor.setIntOption(SocketAdaptor.java:216) ~[na:na]
-	at java.base/sun.nio.ch.SocketAdaptor.setSoLinger(SocketAdaptor.java:254) ~[na:na]
-	at org.apache.tomcat.util.net.SocketProperties.setProperties(SocketProperties.java:203) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.NioEndpoint.setSocketOptions(NioEndpoint.java:490) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.NioEndpoint.setSocketOptions(NioEndpoint.java:70) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.Acceptor.run(Acceptor.java:147) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
-
-2026-06-01T08:49:33.675-04:00  INFO 75525 --- [http-nio-8080-exec-10] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=589784
-2026-06-01T09:09:56.074-04:00  INFO 75525 --- [http-nio-8080-exec-18] o.apache.coyote.http11.Http11Processor   : Error parsing HTTP request header
- Note: further occurrences of HTTP request parsing errors will be logged at DEBUG level.
-
-java.lang.IllegalArgumentException: Invalid character found in method name [0x160x030x010x000xce0x010x000x000xca0x030x030x110xfdJ[A0xe80xf3'T0xde0xb1A(x*V0xd80x850xad0xe60x060xb40x870x190xcak0xce0xf10xde0x81Pc ]. HTTP method names must be tokens
-	at org.apache.coyote.http11.Http11InputBuffer.parseRequestLine(Http11InputBuffer.java:402) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:272) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:903) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1774) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
-	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
-
-2026-06-01T10:07:04.945-04:00  INFO 75525 --- [http-nio-8080-exec-12] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=565680
-2026-06-01T10:18:56.555-04:00  INFO 75525 --- [http-nio-8080-exec-20] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=509252
-2026-06-01T10:39:16.159-04:00  INFO 75525 --- [http-nio-8080-exec-20] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=602976
-2026-06-01T10:39:35.798-04:00  INFO 75525 --- [http-nio-8080-exec-17] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJFULmXHVF9YgRW_5zpdmMNzc, routeId=277, userId=2, userName=testuser, imageSize=615436
-2026-06-01T10:39:52.186-04:00  INFO 75525 --- [http-nio-8080-exec-18] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=615016
-2026-06-01T10:40:15.962-04:00  INFO 75525 --- [http-nio-8080-exec-3] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=603196
-2026-06-01T10:40:32.144-04:00  INFO 75525 --- [http-nio-8080-exec-22] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=609956
-2026-06-01T10:41:11.636-04:00  INFO 75525 --- [http-nio-8080-exec-21] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=328588
-2026-06-01T10:41:54.824-04:00  INFO 75525 --- [http-nio-8080-exec-3] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=372740
-2026-06-01T10:42:02.760-04:00  INFO 75525 --- [http-nio-8080-exec-18] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=417844
-2026-06-01T10:42:26.384-04:00  INFO 75525 --- [http-nio-8080-exec-10] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=381312
-2026-06-01T10:42:34.925-04:00  INFO 75525 --- [http-nio-8080-exec-3] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=383248
-2026-06-01T10:42:47.121-04:00  INFO 75525 --- [http-nio-8080-exec-18] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=404996
-2026-06-01T10:43:17.110-04:00  INFO 75525 --- [http-nio-8080-exec-21] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=381524
-2026-06-01T10:43:23.898-04:00  INFO 75525 --- [http-nio-8080-exec-6] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=369912
-2026-06-01T10:43:31.471-04:00  INFO 75525 --- [http-nio-8080-exec-5] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=384424
-2026-06-01T10:47:23.714-04:00  INFO 75525 --- [http-nio-8080-exec-21] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=573992
-2026-06-01T10:47:31.584-04:00  INFO 75525 --- [http-nio-8080-exec-3] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=563828
-2026-06-01T10:47:35.511-04:00 ERROR 75525 --- [http-nio-8080-exec-17] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
+2026-06-02T06:54:16.709-04:00 ERROR 75525 --- [http-nio-8080-exec-10] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
 
 org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico.
 	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:585) ~[spring-webmvc-6.2.15.jar:6.2.15]
@@ -423,8 +358,106 @@ org.springframework.web.servlet.resource.NoResourceFoundException: No static res
 	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
 	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
 
-2026-06-01T10:47:39.615-04:00  INFO 75525 --- [http-nio-8080-exec-21] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=569296
-2026-06-01T10:47:56.245-04:00  INFO 75525 --- [http-nio-8080-exec-12] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJZ4rYKC1P9YgR8rX6zyWJx50, routeId=277, userId=2, userName=testuser, imageSize=571328
-2026-06-01T10:48:04.463-04:00  INFO 75525 --- [http-nio-8080-exec-18] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJFULmXHVF9YgRW_5zpdmMNzc, routeId=277, userId=2, userName=testuser, imageSize=654108
-2026-06-01T10:48:12.796-04:00  INFO 75525 --- [http-nio-8080-exec-20] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJFULmXHVF9YgRW_5zpdmMNzc, routeId=277, userId=2, userName=testuser, imageSize=590252
-2026-06-01T10:48:31.015-04:00  INFO 75525 --- [http-nio-8080-exec-22] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=591812
+2026-06-02T07:37:16.517-04:00 ERROR 75525 --- [http-nio-8080-exec-12] c.m.m.exception.GlobalExceptionHandler   : An unexpected error occurred
+
+org.springframework.web.servlet.resource.NoResourceFoundException: No static resource favicon.ico.
+	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:585) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter.handle(HttpRequestHandlerAdapter.java:52) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:903) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:564) ~[tomcat-embed-core-10.1.50.jar:6.0]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658) ~[tomcat-embed-core-10.1.50.jar:6.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:193) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51) ~[tomcat-embed-websocket-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.springframework.web.servlet.resource.ResourceUrlEncodingFilter.doFilter(ResourceUrlEncodingFilter.java:66) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:108) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:365) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:101) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at com.meandr.meandrDataServices.security.JwtFilter.doFilterInternal(JwtFilter.java:54) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:107) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:93) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191) ~[spring-security-web-6.4.13.jar:6.4.13]
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.servlet.handler.HandlerMappingIntrospector.lambda$createCacheFilter$4(HandlerMappingIntrospector.java:267) ~[spring-webmvc-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebMvcSecurityConfiguration.java:238) ~[spring-security-config-6.4.13.jar:6.4.13]
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:362) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:278) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.15.jar:6.2.15]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:165) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:482) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:113) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:342) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:399) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:903) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1774) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+
+2026-06-02T08:26:52.894-04:00  INFO 75525 --- [http-nio-8080-exec-20] c.m.m.c.WaypointPhotoController          : WaypointPhoto: received placeId=ChIJqcdKDRRE9YgRvNQQXmmEbv8, routeId=277, userId=2, userName=testuser, imageSize=338920
