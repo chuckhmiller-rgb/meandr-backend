@@ -145,11 +145,14 @@ public class UserRouteController {
         return ResponseEntity.ok(userRouteRepository.save(route));
     }
 
-    // Delete a route
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteRoute(@PathVariable Long id) {
-        userRouteRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteRoute(@PathVariable Long id) {
+        return userRouteRepository.findById(id).map(route -> {
+            route.setDeleted(true);
+            route.setDeletedAt(LocalDateTime.now());
+            userRouteRepository.save(route);
+            return ResponseEntity.ok(Map.of("success", true));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     // Cleanup expired routes (call periodically)

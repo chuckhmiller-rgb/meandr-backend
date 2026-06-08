@@ -81,6 +81,12 @@ public class UserRoute {
     @Column(name = "rejected_stops", columnDefinition = "JSON")
     private String rejectedStops;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
+    @Column
+    private LocalDateTime deletedAt;
+
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stop_order ASC")
     @Builder.Default

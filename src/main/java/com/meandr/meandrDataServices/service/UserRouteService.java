@@ -121,7 +121,7 @@ public class UserRouteService {
 
         return convertToDto(route);
     }
-
+    
     private UserRouteDto convertToDto(UserRoute entity) {
         List<UserRouteDto.RouteStopDto> stopDtos = entity.getStops().stream()
                 .map(stop -> UserRouteDto.RouteStopDto.builder()
