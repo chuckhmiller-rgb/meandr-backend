@@ -29,6 +29,8 @@ public interface UserRouteRepository extends JpaRepository<UserRoute, Long> {
     Optional<UserRoute> findByUserName(String userName);
 
     Optional<UserRoute> findByIdAndUserName(Long userId, String userName);
+    
+    List<UserRoute> findByIsSavedFalseAndCreatedAtBefore(LocalDateTime cutoff);
 
     @Modifying
     @Query("DELETE FROM UserRoute r WHERE r.expiresAt < :now AND r.isSaved = false")

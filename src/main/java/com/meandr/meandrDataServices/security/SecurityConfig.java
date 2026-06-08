@@ -39,6 +39,7 @@ public class SecurityConfig {
                         "/api/v1/osm/**",
                         "/api/places/**",
                         "/api/v1/waypoint-photos/**",
+                        "/api/v1/user-routes/sample",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/swagger-resources/**",

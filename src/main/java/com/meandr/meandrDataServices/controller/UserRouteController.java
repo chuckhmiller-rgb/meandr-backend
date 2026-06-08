@@ -162,6 +162,13 @@ public class UserRouteController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/sample")
+    public ResponseEntity<?> getSampleRoute() {
+        return userRouteRepository.findById(292L)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PatchMapping("/{id}/update-route")
     @Transactional
     public ResponseEntity<UserRoute> updateRoute(

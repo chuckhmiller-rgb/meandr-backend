@@ -19,11 +19,18 @@ public class RouteCleanupScheduler {
         userRouteRepository.deleteExpiredRoutes(LocalDateTime.now());
     }
 
-    @Scheduled(cron = "0 5 2 * * *") // 2:05am
+    @Scheduled(cron = "0 5 2 * * *") // runs daily at 2:05am
     public void hardDeleteOldRoutes() {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(90);
-        List<UserRoute> toDelete = userRouteRepository.findSoftDeletedBefore(cutoff);
-        userRouteRepository.deleteAll(toDelete);
-        System.out.println("RouteCleanup: hard deleted " + toDelete.size() + " routes older than 90 days");
+
+        // Hard delete soft-deleted routes older than 90 days
+        List<UserRoute> softDeleted = userRouteRepository.findSoftDeletedBefore(cutoff);
+        userRouteRepository.deleteAll(softDeleted);
+        System.out.println("RouteCleanup: hard deleted " + softDeleted.size() + " soft-deleted routes older than 90 days");
+
+        // Hard delete unsaved recent routes older than 90 days
+        List<UserRoute> oldRecent = userRouteRepository.findByIsSavedFalseAndCreatedAtBefore(cutoff);
+        userRouteRepository.deleteAll(oldRecent);
+        System.out.println("RouteCleanup: hard deleted " + oldRecent.size() + " old recent routes");
     }
 }
