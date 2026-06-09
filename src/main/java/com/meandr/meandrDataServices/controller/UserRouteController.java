@@ -91,7 +91,7 @@ public class UserRouteController {
 
     @GetMapping("/{userName}/summary")
     public ResponseEntity<List<UserRouteSummaryDto>> getRouteSummaries(@PathVariable String userName) {
-        List<UserRoute> routes = userRouteRepository.findByUserNameOrderByCreatedAtDesc(userName);
+        List<UserRoute> routes = userRouteRepository.findByUserNameAndDeletedFalseOrderByCreatedAtDesc(userName);
         List<UserRouteSummaryDto> summaries = routes.stream().map(r -> UserRouteSummaryDto.builder()
                 .id(r.getId())
                 .routeName(r.getRouteName())
@@ -164,7 +164,7 @@ public class UserRouteController {
 
     @GetMapping("/sample")
     public ResponseEntity<?> getSampleRoute() {
-        return userRouteRepository.findById(292L)
+        return userRouteRepository.findById(324L)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

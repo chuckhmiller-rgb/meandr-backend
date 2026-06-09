@@ -18,6 +18,10 @@ public interface UserRouteRepository extends JpaRepository<UserRoute, Long> {
     List<UserRoute> findByUserNameAndIsSavedTrueOrderByCreatedAtDesc(String userName);
 
     List<UserRoute> findByUserNameAndIsSavedFalseOrderByCreatedAtDesc(String userName);
+    
+    List<UserRoute> findByUserNameAndDeletedFalseOrderByCreatedAtDesc(String userName);
+    
+    
 
     //List<UserRoute> findByUsernameAndDeletedFalse(String userName);
 

@@ -53,6 +53,7 @@ public class AuthController {
             System.out.println("response token generated: " + token);
             return ResponseEntity.ok(Map.of(
                     "token", token,
+                    "id", user.getId(),
                     "username", user.getUsername(),
                     "navigationApp", user.getNavigationApp() != null ? user.getNavigationApp() : "",
                     "navigationVoice", user.getNavigationVoice() != null ? user.getNavigationVoice() : "",

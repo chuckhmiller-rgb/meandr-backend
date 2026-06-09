@@ -139,11 +139,13 @@ public class RouteBeautifierService {
                 routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest,
                 selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
 
-        log.info("selectedRouteCoords received: size={}, first={},{}, middle={},{}",
-                selectedRouteCoords.size(),
-                selectedRouteCoords.get(0).get(1), selectedRouteCoords.get(0).get(0),
-                selectedRouteCoords.get(selectedRouteCoords.size() / 2).get(1),
-                selectedRouteCoords.get(selectedRouteCoords.size() / 2).get(0));
+        if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
+            log.info("selectedRouteCoords received: size={}, first={},{}, middle={},{}",
+                    selectedRouteCoords.size(),
+                    selectedRouteCoords.get(0).get(1), selectedRouteCoords.get(0).get(0),
+                    selectedRouteCoords.get(selectedRouteCoords.size() / 2).get(1),
+                    selectedRouteCoords.get(selectedRouteCoords.size() / 2).get(0));
+        }
 
         List<CoordinateDto> routeCoords;
         long baselineDurationMins;
