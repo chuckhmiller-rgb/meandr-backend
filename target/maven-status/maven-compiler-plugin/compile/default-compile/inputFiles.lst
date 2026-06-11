@@ -7,6 +7,7 @@
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/DebugConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/GoogleMapsConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/JacksonConfig.java
+/Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/MeandrConstants.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/config/OpenApiConfig.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/controller/AuthController.java
 /Users/charlesmiller/meandrDataServices/src/main/java/com/meandr/meandrDataServices/controller/ClimbingGymController.java

@@ -23,6 +23,8 @@ public class SaveRouteRequestDto {
     private Boolean avoidTolls;
     private Boolean excludeOrigin;
     private Boolean excludeDest;
+    private List<String> includeKeywords;
+    private List<String> excludeKeywords;
     private List<String> entityPreferences;
     private List<StopDto> stops;
     private List<StopDto> rejectedStops;

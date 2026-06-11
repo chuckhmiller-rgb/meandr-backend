@@ -48,11 +48,23 @@ public class PlacesCacheService {
         double maxLng = lng + lngDelta;
 
         if (entityTypes == null || entityTypes.isEmpty()) {
-            return Collections.emptyList();
+            // Skip entity type filter — return all cached spots in radius
+            String sql = String.format("""
+            SELECT place_id, name, lat, lng, rating, user_ratings_total,
+                   entity_type, address, opening_hours_json
+            FROM places_cache
+            WHERE lat BETWEEN ? AND ?
+              AND lng BETWEEN ? AND ?
+              AND cached_at > NOW() - INTERVAL %d DAY
+            """, CACHE_TTL_DAYS);
+            List<ScenicSpot> results = jdbcTemplate.query(sql, spotRowMapper,
+                    minLat, maxLat, minLng, maxLng);
+            log.debug("Cache hit (no type filter): {} spots near ({},{})", results.size(), lat, lng);
+            return results;
         }
 
         String placeholders = String.join(",",
-                entityTypes.stream().map(t -> "?").toArray(String[]::new)); 
+                entityTypes.stream().map(t -> "?").toArray(String[]::new));
 
         String sql = String.format("""
                 SELECT place_id, name, lat, lng, rating, user_ratings_total,

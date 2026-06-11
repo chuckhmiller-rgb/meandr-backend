@@ -68,6 +68,12 @@ public class UserRoute {
     
     @Column(name = "exclude_closed_now")
     private Boolean excludeClosedNow = false;
+    
+    @Column(name = "include_keywords", columnDefinition = "TEXT")
+    private String includeKeywords;
+    
+    @Column(name = "exclude_keywords", columnDefinition = "TEXT")
+    private String excludeKeywords;
 
     @Column(name = "entity_preferences", columnDefinition = "TEXT")
     private String entityPreferences;

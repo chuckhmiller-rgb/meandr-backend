@@ -63,7 +63,15 @@ public class GoogleApiProxyController {
             "dentist", "pharmacy", "lawyer", "real_estate_agency",
             "insurance_agency", "bank", "atm", "police", "funeral_home",
             "physiotherapist", "accounting", "storage", "moving_company",
-            "car_dealer", "car_repair", "car_wash", "laundry", "post_office", "restaurant"
+            "car_dealer", "car_repair", "car_wash", "laundry", "post_office", "restaurant",
+            // Additional commercial
+            "spa", "beauty_salon", "hair_salon", "nail_salon",
+            "gym", "fitness_center", "health",
+            "store", "shop", "shopping_mall", "supermarket", "grocery_store",
+            "clothing_store", "furniture_store", "electronics_store",
+            "home_goods_store", "hardware_store"
+            //"meal_takeaway", "meal_delivery",
+            //"lodging", "motel", "gas_station", "parking"
     );
 
     private static final List<String> MOST_RELEVANT_TYPE = List.of(

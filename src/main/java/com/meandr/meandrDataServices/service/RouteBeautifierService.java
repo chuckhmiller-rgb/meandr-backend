@@ -10,6 +10,7 @@ import com.google.maps.model.DirectionsRoute;
 import com.google.maps.model.DirectionsStep;
 import com.google.maps.model.TravelMode;
 import com.meandr.meandrDataServices.config.DebugConfig;
+import com.meandr.meandrDataServices.config.MeandrConstants;
 import com.meandr.meandrDataServices.controller.GoogleApiProxyController;
 import com.meandr.meandrDataServices.dto.*;
 import com.meandr.meandrDataServices.model.ScenicSpot;
@@ -132,7 +133,9 @@ public class RouteBeautifierService {
             boolean excludeOrigin,
             boolean excludeDest,
             int dwellTimePerStop,
-            List<List<Double>> selectedRouteCoords
+            List<List<Double>> selectedRouteCoords,
+            List<String> includeKeywords,
+            List<String> excludeKeywords
     ) throws Exception {
 
         log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, hasSelectedCoords={}",
@@ -244,7 +247,7 @@ public class RouteBeautifierService {
         log.info("Decoded route into {} coordinate points", routeCoords.size());
 
         return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
-                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls);
+                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords);
     }
 
     public Map<String, Object> routeWithWaypoints(
@@ -362,7 +365,9 @@ public class RouteBeautifierService {
             int dwellTimePerStop,
             String encodedPolyline,
             boolean avoidHighways,
-            boolean avoidTolls
+            boolean avoidTolls,
+            List<String> includeKeywords,
+            List<String> excludeKeywords
     ) {
         List<LatLng> path = routeCoords.stream()
                 .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
@@ -385,7 +390,9 @@ public class RouteBeautifierService {
                 entityPreferences,
                 totalPathLength,
                 destinationPoint,
-                (int) routeEnhancementThreshold
+                (int) routeEnhancementThreshold,
+                includeKeywords,
+                excludeKeywords
         );
 
         List<ScenicSpot> topCandidates = getEscalatedSelection(
@@ -397,7 +404,9 @@ public class RouteBeautifierService {
                 excludeOrigin,
                 excludeDest,
                 entityPreferences,
-                routeCoords
+                routeCoords,
+                includeKeywords,
+                excludeKeywords
         );
 
         log.info("Selected {} waypoints from {} candidates", topCandidates.size(), candidates.size());
@@ -586,7 +595,9 @@ public class RouteBeautifierService {
             boolean excludeOrigin,
             boolean excludeDest,
             List<String> entityPreferences,
-            List<CoordinateDto> routeCoords
+            List<CoordinateDto> routeCoords,
+            List<String> includeKeywords,
+            List<String> excludeKeywords
     ) {
         double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
         int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
@@ -701,10 +712,11 @@ public class RouteBeautifierService {
 
                 anchor.setSegmentIndex(seg);
                 if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                    String phase = passName.contains("0.5") ? "P0.5"
-                            : passName.contains("0") ? "P0"
-                            : passName.contains("1") ? "P1"
-                            : "P2";
+                    String phase = passName.contains("user") ? "P0c"
+                            : passName.contains("0.5") ? "P1.5c"
+                            : passName.contains("0") ? "P1c"
+                            : passName.contains("1") ? "P2c"
+                            : "P3c";
                     String src = anchor.getSearchSource() != null ? anchor.getSearchSource() : "";
                     anchor.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
                 }
@@ -767,28 +779,38 @@ public class RouteBeautifierService {
         };
 
         // =================================================================
-        // PASS 0: KW anchors + (KW→NB→PO companions)
-        // =================================================================
-        runAnchorPass.accept("PASS 0 (KW anchors)", isKW);
+// PASS 0: User keyword anchors + (KW→NB→PO companions)
+// =================================================================
+        java.util.function.Predicate<ScenicSpot> isUserKW = wp
+                -> "KW-USER".equals(wp.getSearchSource());
 
-        // =================================================================
-        // PASS 0.5: Type-matched anchors + (KW→NB→PO companions)
-        // =================================================================
-        runAnchorPass.accept("PASS 0.5 (type-matched anchors)", isTypeMatch);
+        if (includeKeywords != null && !includeKeywords.isEmpty()) {
+            runAnchorPass.accept("PASS 0 (user KW anchors)", isUserKW);
+        }
 
-        // =================================================================
-        // PASS 1: NB anchors + (KW→NB→PO companions) for empty segments
-        // =================================================================
-        runAnchorPass.accept("PASS 1 (NB anchors)", isNB);
+// =================================================================
+// PASS 1: KW anchors + (KW→NB→PO companions)
+// =================================================================
+        runAnchorPass.accept("PASS 1 (KW anchors)", isKW);
 
-        // =================================================================
-        // PASS 2: PO anchors + (KW→NB→PO companions) for still-empty segments
-        // =================================================================
-        runAnchorPass.accept("PASS 2 (PO anchors)", isPO);
+// =================================================================
+// PASS 1.5: Type-matched anchors + (KW→NB→PO companions)
+// =================================================================
+        runAnchorPass.accept("PASS 1.5 (type-matched anchors)", isTypeMatch);
+
+// =================================================================
+// PASS 2: NB anchors + (KW→NB→PO companions) for empty segments
+// =================================================================
+        runAnchorPass.accept("PASS 2 (NB anchors)", isNB);
+
+// =================================================================
+// PASS 3: PO anchors + (KW→NB→PO companions) for still-empty segments
+// =================================================================
+        runAnchorPass.accept("PASS 3 (PO anchors)", isPO);
 
         long pass2Count = finalSelection.size();
         double pass2Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-        log.info("After Pass 0/1/2: {} waypoints selected, {}/{} mins budget used ({}%)",
+        log.info("After Pass 0/1/2/3:{} waypoints selected, {}/{} mins budget used ({}%)",
                 pass2Count, String.format("%.1f", pass2Spent), String.format("%.1f", totalTimeBudget),
                 Math.round((pass2Spent / totalTimeBudget) * 100));
 
@@ -849,7 +871,7 @@ public class RouteBeautifierService {
             candidate.setSegmentIndex(seg);
             if (DebugConfig.SHOW_SELECTION_DEBUG) {
                 String src = candidate.getSearchSource() != null ? candidate.getSearchSource() : "";
-                candidate.setSelectionDebugCode("P3" + (src.isEmpty() ? "" : "/" + src));
+                candidate.setSelectionDebugCode("P4" + (src.isEmpty() ? "" : "/" + src));
             }
             finalSelection.add(candidate);
             selectedPlaceIds.add(candidate.getPlaceId());
@@ -981,7 +1003,9 @@ public class RouteBeautifierService {
             List<String> entityPreferences,
             double totalDist,
             LatLng dest,
-            double routeEnhancementThreshold
+            double routeEnhancementThreshold,
+            List<String> includeKeywords,
+            List<String> excludeKeywords
     ) {
 
         log.info("findScenicSpotsAlongPath: path size={}, first={},{}, middle={},{}, last={},{}",
@@ -1001,6 +1025,70 @@ public class RouteBeautifierService {
         List<String> nearbyTypes = entityPreferences.stream()
                 .filter(e -> !GoogleApiProxyController.ENTITY_KEYWORDS.containsKey(e))
                 .collect(Collectors.toList());
+
+        // ── Pass 0: User include keywords ────────────────────────────────────
+        if (includeKeywords != null && !includeKeywords.isEmpty()) {
+            log.info("Pass 0: running {} user include keywords", includeKeywords.size());
+            double odometer2 = 0;
+            double lastSearch2 = 0;
+            for (int i = 0; i < path.size() - 1; i += samplingStep) {
+                LatLng p1 = path.get(i);
+                double stepDist = haversine(p1.lat, p1.lng,
+                        path.get(Math.min(i + samplingStep, path.size() - 1)).lat,
+                        path.get(Math.min(i + samplingStep, path.size() - 1)).lng);
+                odometer2 += stepDist;
+
+                if (odometer2 - lastSearch2 >= 15.0) {
+                    lastSearch2 = odometer2;
+                    for (String keyword : includeKeywords) {
+                        List<ScenicSpot> kwResults = googleProxy.searchTextScenic(
+                                p1.lat, p1.lng, radius, keyword, new ArrayList<>());
+                        for (ScenicSpot spot : kwResults) {
+                            if (seenPlaceIds.contains(spot.getPlaceId())) {
+                                continue;
+                            }
+
+                            // Filter 1: name must contain at least one include keyword
+                            boolean nameMatch = includeKeywords.stream()
+                                    .anyMatch(kw -> spot.getName().toLowerCase().contains(kw.toLowerCase()));
+                            if (!nameMatch) {
+                                log.info("Pass 0: name filter rejected: {}", spot.getName());
+                                continue;
+                            }
+
+                            // Filter 2: exclude commercial entity types
+                            if (spot.getEntityType() != null && MeandrConstants.EXCLUDED_PLACE_TYPES.stream()
+                                    .anyMatch(t -> spot.getEntityType().toLowerCase().contains(t))) {
+                                log.info("Pass 0: type filter rejected: {} ({})", spot.getName(), spot.getEntityType());
+                                continue;
+                            }
+
+                            // Filter 3: exclude keywords
+                            if (excludeKeywords != null && !excludeKeywords.isEmpty()) {
+                                String nameLower = spot.getName() != null ? spot.getName().toLowerCase() : "";
+                                String addrLower = spot.getAddress() != null ? spot.getAddress().toLowerCase() : "";
+                                boolean excluded = excludeKeywords.stream()
+                                        .map(String::toLowerCase)
+                                        .anyMatch(kw -> nameLower.contains(kw) || addrLower.contains(kw));
+                                if (excluded) {
+                                    log.info("Pass 0: exclude filter rejected: {}", spot.getName());
+                                    continue;
+                                }
+                            }
+
+                            seenPlaceIds.add(spot.getPlaceId());
+                            spot.setDistFromStart(odometer2);
+                            spot.setScore(calculateScore(spot, path, totalDist, 10.0, dest));
+                            spot.setSearchSource("KW-USER");
+                            if (DebugConfig.SHOW_SELECTION_DEBUG) {
+                                spot.setSelectionDebugCode("KW-USER");
+                            }
+                            rawGoogleSpots.add(spot);
+                        }
+                    }
+                }
+            }
+        }
 
         // ── Google Places main pass ───────────────────────────────────────────
         double odometer = 0;

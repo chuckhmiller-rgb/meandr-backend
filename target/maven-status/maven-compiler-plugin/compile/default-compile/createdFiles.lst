@@ -75,6 +75,7 @@ com/meandr/meandrDataServices/dto/UserRouteDto$RouteStopDto.class
 com/meandr/meandrDataServices/osm/controller/OsmController.class
 com/meandr/meandrDataServices/service/EntityPreferenceService$CategoryPreferenceView.class
 com/meandr/meandrDataServices/dto/UsersResponseDto.class
+com/meandr/meandrDataServices/config/MeandrConstants.class
 com/meandr/meandrDataServices/config/CorsConfig.class
 com/meandr/meandrDataServices/controller/AuthController.class
 com/meandr/meandrDataServices/security/JwtFilter.class

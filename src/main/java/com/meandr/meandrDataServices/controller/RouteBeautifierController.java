@@ -89,7 +89,9 @@ public class RouteBeautifierController {
                 request.isExcludeOrigin(),
                 request.isExcludeDest(),
                 request.getDwellTimePerStop(),
-                request.getSelectedRouteCoords()
+                request.getSelectedRouteCoords(),
+                request.getIncludeKeywords(),
+                request.getExcludeKeywords()
         );
 
         // Echo request parameters back in response
@@ -102,7 +104,7 @@ public class RouteBeautifierController {
         response.setEntityPreferences(request.getEntityPreferences());
         response.setDwellTimePerStop(request.getDwellTimePerStop());
         response.setRouteEnhancementThreshold(request.getRouteEnhancementThreshold());
-        
+
         log.debug("response is: " + response.toString());
 
         return ResponseEntity.ok(response);

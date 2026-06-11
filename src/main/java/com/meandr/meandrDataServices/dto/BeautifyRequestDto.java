@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class BeautifyRequestDto {
+
     private List<List<Double>> selectedRouteCoords;
     private CoordinateDto origin;
     private CoordinateDto destination;
@@ -20,4 +21,6 @@ public class BeautifyRequestDto {
     private boolean avoidTolls = false;
     private boolean excludeOrigin = false;
     private boolean excludeDest = false;
+    private List<String> includeKeywords;
+    private List<String> excludeKeywords;
 }
