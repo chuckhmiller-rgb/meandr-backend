@@ -622,8 +622,11 @@ public class RouteBeautifierService {
         log.info("Segments: count={}, {} km each, {} mins budget each",
                 numSegments, String.format("%.1f", segmentLength), String.format("%.1f", budgetPerSegment));
         log.info("Candidates: {} total spots to evaluate", allFoundSpots.size());
+        log.info("Keywords — include: {} | exclude: {}",
+                includeKeywords != null ? includeKeywords : "none",
+                excludeKeywords != null ? excludeKeywords : "none");
 
-        // Exclude stops near origin/destination
+        // ── Exclude origin/destination radius ────────────────────────────────
         if (excludeOrigin || excludeDest) {
             final double EXCLUDE_RADIUS_KM = 40.0;
             final double originLat = originPoint.lat;
@@ -641,38 +644,70 @@ public class RouteBeautifierService {
                         return true;
                     })
                     .collect(Collectors.toList());
+            log.info("After origin/dest exclude: {} candidates remain", allFoundSpots.size());
         }
 
-        log.info("After exclude filter: {} candidates remain (excludeOrigin={}, excludeDest={})",
-                allFoundSpots.size(), excludeOrigin, excludeDest);
+        // ── Exclude keywords filter ───────────────────────────────────────────
+        if (excludeKeywords != null && !excludeKeywords.isEmpty()) {
+            List<String> lowerExcludes = excludeKeywords.stream()
+                    .map(String::toLowerCase).collect(Collectors.toList());
+            allFoundSpots = allFoundSpots.stream()
+                    .filter(wp -> {
+                        String nameLower = wp.getName() != null ? wp.getName().toLowerCase() : "";
+                        String addrLower = wp.getAddress() != null ? wp.getAddress().toLowerCase() : "";
+                        boolean excluded = lowerExcludes.stream()
+                                .anyMatch(kw -> nameLower.contains(kw) || addrLower.contains(kw));
+                        if (excluded) {
+                            log.info("Exclude keyword filter rejected: {}", wp.getName());
+                        }
+                        return !excluded;
+                    })
+                    .collect(Collectors.toList());
+            log.info("After exclude keyword filter: {} candidates remain", allFoundSpots.size());
+        }
 
         final List<ScenicSpot> frozenSpots = Collections.unmodifiableList(allFoundSpots);
 
-        // Build preferred Google types
+        // ── Preferred Google types ────────────────────────────────────────────
         Set<String> preferredGoogleTypes = entityPreferences.stream()
                 .flatMap(p -> GooglePlacesTypeMapper.toGoogleTypes(List.of(p)).stream())
                 .collect(Collectors.toSet());
-        boolean hasStrictPrefs = !preferredGoogleTypes.isEmpty();
-        log.info("preferredGoogleTypes: {} hasStrictPrefs={}", preferredGoogleTypes, hasStrictPrefs);
+        log.info("preferredGoogleTypes: {} hasStrictPrefs={}", preferredGoogleTypes, !preferredGoogleTypes.isEmpty());
 
-        // ── Source predicates ─────────────────────────────────────────────
+        // ── Source predicates ─────────────────────────────────────────────────
+        java.util.function.Predicate<ScenicSpot> isUserKW = wp
+                -> "KW-USER".equals(wp.getSearchSource());
         java.util.function.Predicate<ScenicSpot> isKW = wp
-                -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("KW");
+                -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("KW") && !isUserKW.test(wp);
         java.util.function.Predicate<ScenicSpot> isNB = wp
                 -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("NB");
         java.util.function.Predicate<ScenicSpot> isPO = wp
-                -> wp.getSearchSource() == null || (!wp.getSearchSource().startsWith("KW") && !wp.getSearchSource().startsWith("NB"));
+                -> wp.getSearchSource() == null
+                || (!wp.getSearchSource().startsWith("KW") && !wp.getSearchSource().startsWith("NB"));
         java.util.function.Predicate<ScenicSpot> isTypeMatch = wp
                 -> preferredGoogleTypes.contains(wp.getEntityType());
 
-        // ── Helper: run one anchor+companion pass for a given anchor predicate ──
-        // Finds best anchor per empty segment, clusters KW→NB→PO companions within 10km
+        // ── runAnchorPass: finds best anchor per empty segment, clusters companions ──
         java.util.function.BiConsumer<String, java.util.function.Predicate<ScenicSpot>> runAnchorPass = (passName, anchorFilter) -> {
             log.info("--- {} ---", passName);
 
+            // Pass-specific thresholds
+            int minReviews = passName.contains("user") ? 10 : passName.contains("1 ") ? 100 : 1000;
+            double minRating = passName.contains("user") ? 3.5 : 4.5;
+
+            // Anchor debug phase label
+            String anchorPhase = passName.contains("user") ? "P0"
+                    : passName.contains("1.5") ? "P1.5"
+                    : passName.contains("1") ? "P1"
+                    : passName.contains("2") ? "P2"
+                    : "P3";
+
+            // Companion debug phase label
+            String companionPhase = anchorPhase + "c";
+
             for (int i = 0; i < numSegments; i++) {
                 if (segmentCount[i] > 0) {
-                    continue; // already has a stop
+                    continue;
                 }
                 final int seg = i;
 
@@ -684,13 +719,14 @@ public class RouteBeautifierService {
                 java.util.function.Predicate<ScenicSpot> inSeg = wp
                         -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg;
 
-                // Find anchor — KW passes use lower review threshold since niche spots are rare
-                int minReviews = passName.contains("0") ? 100 : 1000;
-
+                // Find best anchor for this segment
                 Optional<ScenicSpot> anchorOpt = frozenSpots.stream()
-                        .filter(wp -> wp.getRating() >= 4.5)
+                        .filter(wp -> wp.getRating() >= minRating)
                         .filter(wp -> wp.getUserRatingsTotal() >= minReviews)
                         .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                        .filter(wp -> finalSelection.stream().noneMatch(selected
+                        -> selected.getName().equalsIgnoreCase(wp.getName())
+                        && haversineKm(selected.getLat(), selected.getLng(), wp.getLat(), wp.getLng()) < 5.0))
                         .filter(inSeg)
                         .filter(anchorFilter)
                         .max(Comparator.comparingDouble(ScenicSpot::getScore));
@@ -703,7 +739,7 @@ public class RouteBeautifierService {
                 ScenicSpot anchor = anchorOpt.get();
                 double anchorCost = anchor.getDetour() + dwellTimePerStop;
                 if (globalSpent + anchorCost > totalTimeBudget) {
-                    log.info("  {}: seg={} anchor {} over budget (cost={}, remaining={})",
+                    log.info("  {}: seg={} anchor '{}' over budget (cost={}, remaining={})",
                             passName, seg, anchor.getName(),
                             String.format("%.1f", anchorCost),
                             String.format("%.1f", totalTimeBudget - globalSpent));
@@ -712,26 +748,21 @@ public class RouteBeautifierService {
 
                 anchor.setSegmentIndex(seg);
                 if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                    String phase = passName.contains("user") ? "P0c"
-                            : passName.contains("0.5") ? "P1.5c"
-                            : passName.contains("0") ? "P1c"
-                            : passName.contains("1") ? "P2c"
-                            : "P3c";
                     String src = anchor.getSearchSource() != null ? anchor.getSearchSource() : "";
-                    anchor.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
+                    anchor.setSelectionDebugCode(anchorPhase + (src.isEmpty() ? "" : "/" + src));
                 }
                 finalSelection.add(anchor);
                 selectedPlaceIds.add(anchor.getPlaceId());
                 segmentCount[seg]++;
                 segmentSpent[seg] += anchorCost;
-                log.info("  {}: seg={} anchor selected: {} (score={}, cost={}, source={})",
+                log.info("  {}: seg={} anchor='{}' score={} cost={} src={}",
                         passName, seg, anchor.getName(),
                         String.format("%.1f", anchor.getScore()),
                         String.format("%.1f", anchorCost),
                         anchor.getSearchSource());
 
-                // Cluster companions: KW first, then NB, then PO
-                List<java.util.function.Predicate<ScenicSpot>> companionTiers = List.of(isKW, isNB, isPO);
+                // Cluster companions: KW-USER → KW → NB → PO
+                List<java.util.function.Predicate<ScenicSpot>> companionTiers = List.of(isUserKW, isKW, isNB, isPO);
                 for (java.util.function.Predicate<ScenicSpot> tier : companionTiers) {
                     List<ScenicSpot> tierCandidates = frozenSpots.stream()
                             .filter(wp -> wp.getRating() >= 4.3)
@@ -744,7 +775,7 @@ public class RouteBeautifierService {
 
                     for (ScenicSpot companion : tierCandidates) {
                         if (segmentCount[seg] >= 3) {
-                            break; // max 3 per segment
+                            break;
                         }
                         double gSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
                         if (gSpent >= totalTimeBudget) {
@@ -754,21 +785,30 @@ public class RouteBeautifierService {
                         if (gSpent + companionCost > totalTimeBudget) {
                             continue;
                         }
+                        
+                        // Skip if same name as anchor or another already-selected spot within 5km
+                        boolean isDuplicate = finalSelection.stream()
+                                .anyMatch(selected
+                                        -> selected.getName().equalsIgnoreCase(companion.getName())
+                                && haversineKm(selected.getLat(), selected.getLng(), companion.getLat(), companion.getLng()) < 5.0
+                                );
+                        if (isDuplicate) {
+                            log.info("  {}: seg={} companion '{}' skipped — duplicate name within 5km",
+                                    passName, seg, companion.getName());
+                            continue;
+                        }
 
                         companion.setSegmentIndex(seg);
+                        
                         if (DebugConfig.SHOW_SELECTION_DEBUG) {
-                            String phase = passName.contains("0.5") ? "P0.5c"
-                                    : passName.contains("0") ? "P0c"
-                                    : passName.contains("1") ? "P1c"
-                                    : "P2c";
                             String src = companion.getSearchSource() != null ? companion.getSearchSource() : "";
-                            companion.setSelectionDebugCode(phase + (src.isEmpty() ? "" : "/" + src));
+                            companion.setSelectionDebugCode(companionPhase + (src.isEmpty() ? "" : "/" + src));
                         }
                         finalSelection.add(companion);
                         selectedPlaceIds.add(companion.getPlaceId());
                         segmentCount[seg]++;
                         segmentSpent[seg] += companionCost;
-                        log.info("  {}: seg={} companion added: {} (score={}, cost={}, source={})",
+                        log.info("  {}: seg={} companion='{}' score={} cost={} src={}",
                                 passName, seg, companion.getName(),
                                 String.format("%.1f", companion.getScore()),
                                 String.format("%.1f", companionCost),
@@ -779,74 +819,58 @@ public class RouteBeautifierService {
         };
 
         // =================================================================
-// PASS 0: User keyword anchors + (KW→NB→PO companions)
-// =================================================================
-        java.util.function.Predicate<ScenicSpot> isUserKW = wp
-                -> "KW-USER".equals(wp.getSearchSource());
-
+        // PASS 0: User keyword anchors + (KW-USER→KW→NB→PO companions)
+        // =================================================================
         if (includeKeywords != null && !includeKeywords.isEmpty()) {
             runAnchorPass.accept("PASS 0 (user KW anchors)", isUserKW);
         }
 
-// =================================================================
-// PASS 1: KW anchors + (KW→NB→PO companions)
-// =================================================================
+        // =================================================================
+        // PASS 1: KW anchors + (KW-USER→KW→NB→PO companions)
+        // =================================================================
         runAnchorPass.accept("PASS 1 (KW anchors)", isKW);
 
-// =================================================================
-// PASS 1.5: Type-matched anchors + (KW→NB→PO companions)
-// =================================================================
+        // =================================================================
+        // PASS 1.5: Type-matched anchors + (KW-USER→KW→NB→PO companions)
+        // =================================================================
         runAnchorPass.accept("PASS 1.5 (type-matched anchors)", isTypeMatch);
 
-// =================================================================
-// PASS 2: NB anchors + (KW→NB→PO companions) for empty segments
-// =================================================================
+        // =================================================================
+        // PASS 2: NB anchors + (KW-USER→KW→NB→PO companions)
+        // =================================================================
         runAnchorPass.accept("PASS 2 (NB anchors)", isNB);
 
-// =================================================================
-// PASS 3: PO anchors + (KW→NB→PO companions) for still-empty segments
-// =================================================================
+        // =================================================================
+        // PASS 3: PO anchors + (KW-USER→KW→NB→PO companions)
+        // =================================================================
         runAnchorPass.accept("PASS 3 (PO anchors)", isPO);
 
-        long pass2Count = finalSelection.size();
-        double pass2Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-        log.info("After Pass 0/1/2/3:{} waypoints selected, {}/{} mins budget used ({}%)",
-                pass2Count, String.format("%.1f", pass2Spent), String.format("%.1f", totalTimeBudget),
-                Math.round((pass2Spent / totalTimeBudget) * 100));
+        long prePass4Count = finalSelection.size();
+        double prePass4Spent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+        log.info("After Passes 0-3: {} waypoints selected, {}/{} mins budget used ({}%)",
+                prePass4Count, String.format("%.1f", prePass4Spent), String.format("%.1f", totalTimeBudget),
+                Math.round((prePass4Spent / totalTimeBudget) * 100));
 
         // =================================================================
-        // PASS 3: Budget diffusion — KW exhausted first, then NB, then PO
+        // PASS 4: Budget diffusion — KW-USER first, then KW, NB, PO
         // =================================================================
-        log.info("--- PASS 3: Budget diffusion ---");
-
-        // Build remaining candidates by source tier
-        List<ScenicSpot> remainingKW = allFoundSpots.stream()
-                .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
-                .filter(isKW)
-                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
-                .collect(Collectors.toList());
-        List<ScenicSpot> remainingNB = allFoundSpots.stream()
-                .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
-                .filter(isNB)
-                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
-                .collect(Collectors.toList());
-        List<ScenicSpot> remainingPO = allFoundSpots.stream()
-                .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
-                .filter(isPO)
-                .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
-                .collect(Collectors.toList());
+        log.info("--- PASS 4: Budget diffusion ---");
 
         List<ScenicSpot> diffusionPool = new ArrayList<>();
-        diffusionPool.addAll(remainingKW);
-        diffusionPool.addAll(remainingNB);
-        diffusionPool.addAll(remainingPO);
+        for (java.util.function.Predicate<ScenicSpot> tier : List.of(isUserKW, isKW, isNB, isPO)) {
+            allFoundSpots.stream()
+                    .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
+                    .filter(tier)
+                    .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
+                    .forEach(diffusionPool::add);
+        }
 
         for (ScenicSpot candidate : diffusionPool) {
-            double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
-            if (globalSpent >= totalTimeBudget) {
+            if (finalSelection.size() >= 23) {
                 break;
             }
-            if (finalSelection.size() >= 23) {
+            double globalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+            if (globalSpent >= totalTimeBudget) {
                 break;
             }
             if (selectedPlaceIds.contains(candidate.getPlaceId())) {
@@ -864,7 +888,7 @@ public class RouteBeautifierService {
             }
 
             if (!isSpaceAvailable(finalSelection, candidate, totalPathLength)) {
-                log.info("  Pass 3: skipped (too close): {}", candidate.getName());
+                log.info("  Pass 4: skipped (too close): {}", candidate.getName());
                 continue;
             }
 
@@ -877,34 +901,35 @@ public class RouteBeautifierService {
             selectedPlaceIds.add(candidate.getPlaceId());
             segmentCount[seg]++;
             segmentSpent[seg] += cost;
-            log.info("  Pass 3: added: {} (score={}, cost={}, source={})",
+            log.info("  Pass 4: added='{}' score={} cost={} src={}",
                     candidate.getName(),
                     String.format("%.1f", candidate.getScore()),
                     String.format("%.1f", cost),
                     candidate.getSearchSource());
         }
 
+        // ── Final stats ───────────────────────────────────────────────────────
         double finalSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
         log.info("=== ESCALATED SELECTION COMPLETE ===");
-        log.info("Waypoints: {} selected | Actual time cost: {}/{} mins ({}%) | Diffusion added: {}",
+        log.info("Total: {} waypoints | {}/{} mins ({}%) | Pass 4 added: {}",
                 finalSelection.size(),
                 String.format("%.1f", finalSpent),
                 String.format("%.1f", totalTimeBudget),
                 Math.round((finalSpent / totalTimeBudget) * 100),
-                finalSelection.size() - pass2Count);
+                finalSelection.size() - prePass4Count);
 
         for (int seg = 0; seg < numSegments; seg++) {
             final int currentSeg = seg;
-            log.info("  Segment {}: {} waypoints, {}/{} mins spent",
+            log.info("  Segment {}: {} waypoints, {}/{} mins",
                     seg,
                     finalSelection.stream().filter(s -> s.getSegmentIndex() == currentSeg).count(),
                     String.format("%.1f", segmentSpent[seg]),
                     String.format("%.1f", segmentBudget[seg]));
         }
 
-        // Corridor filter
+        // ── Corridor filter ───────────────────────────────────────────────────
         if (routeCoords != null && !routeCoords.isEmpty()) {
-            double MAX_CORRIDOR_KM = 35.0;
+            final double MAX_CORRIDOR_KM = 35.0;
             List<ScenicSpot> filtered = finalSelection.stream()
                     .filter(spot -> {
                         double dist = minDistanceFromPathKm(spot.getLat(), spot.getLng(), routeCoords);
@@ -920,8 +945,8 @@ public class RouteBeautifierService {
         }
 
         finalSelection.sort(Comparator.comparingDouble(ScenicSpot::getDistFromStart));
-        log.info("Finally selected waypoints: {}", finalSelection.stream()
-                .map(s -> s.getName() + " (" + s.getLat() + "," + s.getLng() + ")")
+        log.info("Final waypoints: {}", finalSelection.stream()
+                .map(s -> s.getName() + " [" + s.getSelectionDebugCode() + "]")
                 .collect(Collectors.joining(", ")));
         return finalSelection;
     }
@@ -1020,10 +1045,10 @@ public class RouteBeautifierService {
 
         // Split entity prefs into keyword vs non-keyword types (done once, reused in all passes)
         List<String> keywordTypes = entityPreferences.stream()
-                .filter(GoogleApiProxyController.ENTITY_KEYWORDS::containsKey)
+                .filter(MeandrConstants.ENTITY_KEYWORDS::containsKey)
                 .collect(Collectors.toList());
         List<String> nearbyTypes = entityPreferences.stream()
-                .filter(e -> !GoogleApiProxyController.ENTITY_KEYWORDS.containsKey(e))
+                .filter(e -> !MeandrConstants.ENTITY_KEYWORDS.containsKey(e))
                 .collect(Collectors.toList());
 
         // ── Pass 0: User include keywords ────────────────────────────────────
@@ -1261,7 +1286,7 @@ public class RouteBeautifierService {
         List<ScenicSpot> keywordResults = new ArrayList<>();
         Map<String, String> placeIdToKeyword = new HashMap<>();
         for (String entityType : keywordTypes) {
-            String kw = GoogleApiProxyController.ENTITY_KEYWORDS.get(entityType);
+            String kw = MeandrConstants.ENTITY_KEYWORDS.get(entityType);
             List<String> googleTypes = GooglePlacesTypeMapper.toGoogleTypes(List.of(entityType));
             List<ScenicSpot> kwSpots = googleProxy.searchTextScenic(lat, lng, searchRadius, kw, googleTypes);
             kwSpots.forEach(s -> placeIdToKeyword.put(s.getPlaceId(), kw));
