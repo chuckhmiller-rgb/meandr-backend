@@ -69,14 +69,16 @@ public class RouteBeautifierController {
             @RequestBody BeautifyRequestDto request) throws Exception {
 
         log.debug("Request body: {}", new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request));
-        log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={} avoidTolls={} excludeOrigin={} excludeDest={} ",
+        log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={} avoidTolls={} excludeOrigin={} excludeDest={} includeKeywords={}, excludeKeywords={}",
                 request.getOrigin().getLat(), request.getOrigin().getLng(),
                 request.getDestination().getLat(), request.getDestination().getLng(),
                 request.getRouteEnhancementThreshold(),
                 request.isAvoidHighways(),
                 request.isAvoidTolls(),
                 request.isExcludeOrigin(),
-                request.isExcludeDest());
+                request.isExcludeDest(),
+                request.getIncludeKeywords(),
+                request.getExcludeKeywords());
 
         BeautifiedRouteResponseDto response = beautifierService.beautifyRouteWithScenicRoads(
                 request.getOrigin(),

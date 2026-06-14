@@ -1102,7 +1102,7 @@ public class RouteBeautifierService {
                             }
 
                             seenPlaceIds.add(spot.getPlaceId());
-                            spot.setDistFromStart(odometer2);
+                            spot.setDistFromStart(haversine(path.get(0).lat, path.get(0).lng, spot.getLat(), spot.getLng()));
                             spot.setScore(calculateScore(spot, path, totalDist, 10.0, dest));
                             spot.setSearchSource("KW-USER");
                             if (DebugConfig.SHOW_SELECTION_DEBUG) {
@@ -1341,7 +1341,7 @@ public class RouteBeautifierService {
                 continue;
             }
             seenPlaceIds.add(spot.getPlaceId());
-            spot.setDistFromStart(odometer);
+            spot.setDistFromStart(haversine(path.get(0).lat, path.get(0).lng, spot.getLat(), spot.getLng()));
 
             // Source bonus — prioritizes user-selected types over fill candidates
             double sourceBonus = 0;
