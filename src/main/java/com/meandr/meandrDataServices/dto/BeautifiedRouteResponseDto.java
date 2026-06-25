@@ -2,7 +2,9 @@ package com.meandr.meandrDataServices.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.meandr.meandrDataServices.model.ScenicSpot;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -28,6 +30,9 @@ public class BeautifiedRouteResponseDto {
     private List<String> entityPreferences;
     private TripSummary summary;
     private String warningMessage;
+    private List<Map<String, Double>> restStopZones = new ArrayList<>();
+    
+    //private List<RestStopDto> restStops;
 
     /**
      * Single constructor — covers both standard and enhanced routes.
@@ -42,7 +47,8 @@ public class BeautifiedRouteResponseDto {
             double totalDetourMins,
             long originalDurationMins,
             double routeEnhancementThreshold,
-            String warningMessage) {
+            String warningMessage,
+            List<Map<String, Double>> restStopZones) {
 
         this.waypointCount = waypointCount;
         this.masterPolyline = masterPolyline;
@@ -51,6 +57,7 @@ public class BeautifiedRouteResponseDto {
         this.rejectedWaypoints = rejectedWaypoints;
         this.beautifiedRoute = beautifiedRoute;
         this.warningMessage = warningMessage;
+        this.restStopZones = restStopZones;
         
         
 

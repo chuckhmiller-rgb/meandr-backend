@@ -2,8 +2,10 @@ package com.meandr.meandrDataServices.dto;
 
 import lombok.Data;
 import java.util.List;
+import lombok.AllArgsConstructor;
 
 @Data
+@AllArgsConstructor
 public class RerouteRequestDto {
 
     private CoordinateDto origin;

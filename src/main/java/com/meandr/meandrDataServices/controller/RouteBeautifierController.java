@@ -1,3 +1,4 @@
+
 package com.meandr.meandrDataServices.controller;
 
 import com.meandr.meandrDataServices.dto.BeautifiedRouteResponseDto;
@@ -70,15 +71,18 @@ public class RouteBeautifierController {
 
         log.debug("Request body: {}", new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request));
         log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={} avoidTolls={} excludeOrigin={} excludeDest={} includeKeywords={}, excludeKeywords={}",
-                request.getOrigin().getLat(), request.getOrigin().getLng(),
-                request.getDestination().getLat(), request.getDestination().getLng(),
+                request.getOrigin().getLat(), 
+                request.getOrigin().getLng(),
+                request.getDestination().getLat(), 
+                request.getDestination().getLng(),
                 request.getRouteEnhancementThreshold(),
                 request.isAvoidHighways(),
                 request.isAvoidTolls(),
                 request.isExcludeOrigin(),
                 request.isExcludeDest(),
                 request.getIncludeKeywords(),
-                request.getExcludeKeywords());
+                request.getExcludeKeywords(),
+                request.getRestStopCadence());
 
         BeautifiedRouteResponseDto response = beautifierService.beautifyRouteWithScenicRoads(
                 request.getOrigin(),
@@ -93,7 +97,8 @@ public class RouteBeautifierController {
                 request.getDwellTimePerStop(),
                 request.getSelectedRouteCoords(),
                 request.getIncludeKeywords(),
-                request.getExcludeKeywords()
+                request.getExcludeKeywords(),
+                request.getRestStopCadence()
         );
 
         // Echo request parameters back in response

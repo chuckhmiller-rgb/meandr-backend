@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
-@NoArgsConstructor
+//@NoArgsConstructor
 public class CoordinateDto {
     private double lat;
     private double lng;

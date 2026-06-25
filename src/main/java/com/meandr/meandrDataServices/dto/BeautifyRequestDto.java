@@ -23,4 +23,5 @@ public class BeautifyRequestDto {
     private boolean excludeDest = false;
     private List<String> includeKeywords;
     private List<String> excludeKeywords;
+    private String restStopCadence;
 }

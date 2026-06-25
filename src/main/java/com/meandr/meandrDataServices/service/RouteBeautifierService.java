@@ -135,7 +135,8 @@ public class RouteBeautifierService {
             int dwellTimePerStop,
             List<List<Double>> selectedRouteCoords,
             List<String> includeKeywords,
-            List<String> excludeKeywords
+            List<String> excludeKeywords,
+            String restStopCadence
     ) throws Exception {
 
         log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, hasSelectedCoords={}",
@@ -247,7 +248,7 @@ public class RouteBeautifierService {
         log.info("Decoded route into {} coordinate points", routeCoords.size());
 
         return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
-                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords);
+                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords, restStopCadence);
     }
 
     public Map<String, Object> routeWithWaypoints(
@@ -352,6 +353,9 @@ public class RouteBeautifierService {
      * @param excludeDest
      * @param avoidHighways
      * @param avoidTolls
+     * @param includeKeywords
+     * @param excludeKeywords
+     * @param restStopCadence
      * @return
      */
     public BeautifiedRouteResponseDto beautifyRoute(
@@ -367,7 +371,8 @@ public class RouteBeautifierService {
             boolean avoidHighways,
             boolean avoidTolls,
             List<String> includeKeywords,
-            List<String> excludeKeywords
+            List<String> excludeKeywords,
+            String restStopCadence
     ) {
         List<LatLng> path = routeCoords.stream()
                 .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
@@ -424,47 +429,69 @@ public class RouteBeautifierService {
         }
 
         List<ScenicSpot> actualWaypoints = routing.getActualWaypoints();
-
         Set<String> routedIds = actualWaypoints.stream()
                 .map(ScenicSpot::getPlaceId)
                 .collect(Collectors.toSet());
-
-        // Ensure all candidates have a score before building rejected list
         for (ScenicSpot spot : candidates) {
             if (spot.getScore() == 0) {
                 spot.setScore(spot.getRating() * Math.log(Math.max(1, spot.getUserRatingsTotal())));
             }
         }
-
         List<ScenicSpot> rejectedWaypoints = candidates.stream()
                 .filter(spot -> !routedIds.contains(spot.getPlaceId()))
                 .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
                 .collect(Collectors.toList());
-
         double totalDetourMins = actualWaypoints.stream()
                 .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
                 .sum();
-
         double actualEnhancement = baselineDurationMins > 0
-                ? (totalDetourMins / baselineDurationMins) * 100.0
-                : 0.0;
-
+                ? (totalDetourMins / baselineDurationMins) * 100.0 : 0.0;
         double enhancementBudgetMins = baselineDurationMins * (routeEnhancementThreshold / 100.0);
-
         String warningMessage = null;
         if (Math.abs(actualEnhancement - routeEnhancementThreshold) > 15) {
             warningMessage = String.format(
                     "Could not meet your enhancement target of %.0f%%. "
                     + "Delivered %.1f%% enhancement (%.0f of %.0f mins budget used).",
-                    routeEnhancementThreshold,
-                    actualEnhancement,
-                    totalDetourMins,
-                    enhancementBudgetMins
-            );
+                    routeEnhancementThreshold, actualEnhancement,
+                    totalDetourMins, enhancementBudgetMins);
             log.warn(warningMessage);
         }
 
-        return new BeautifiedRouteResponseDto(
+        // Compute rest stop zones from final polyline
+        List<Map<String, Double>> restStopZones = new ArrayList<>();
+        if (restStopCadence != null && !restStopCadence.equals("none")) {
+            String finalPolyline = routing.getPolyline().isEmpty() ? encodedPolyline : routing.getPolyline();
+            List<LatLng> polylinePath = PolylineEncoding.decode(finalPolyline).stream()
+                    .map(ll -> new LatLng(ll.lat, ll.lng))
+                    .collect(Collectors.toList());
+            
+            log.info("Polyline size is {})",
+                    routing.steps.size());
+                    
+
+            int denom = switch (restStopCadence) {
+                case "midpoint" ->
+                    2;
+                case "thirds" ->
+                    3;
+                case "quarters" ->
+                    4;
+                default ->
+                    8;
+            };
+
+            double totalLen = 0;
+            for (int i = 0; i < polylinePath.size() - 1; i++) {
+                totalLen += haversine(polylinePath.get(i).lat, polylinePath.get(i).lng,
+                        polylinePath.get(i + 1).lat, polylinePath.get(i + 1).lng);
+            }
+            for (int s = 1; s < denom; s++) {
+                LatLng pt = findPointAtDistance(polylinePath, totalLen * s / denom);
+                restStopZones.add(Map.of("lat", pt.lat, "lng", pt.lng));
+            }
+        }
+
+        BeautifiedRouteResponseDto dto = new BeautifiedRouteResponseDto(
                 actualWaypoints.size(),
                 routing.getPolyline().isEmpty() ? encodedPolyline : routing.getPolyline(),
                 routing.getDebugUrl(),
@@ -474,16 +501,28 @@ public class RouteBeautifierService {
                 totalDetourMins,
                 baselineDurationMins,
                 routeEnhancementThreshold,
-                warningMessage
+                warningMessage,
+                restStopZones
         );
+
+        return dto;
     }
 
-    /**
-     * Fetch route details with self-healing that removes problematic waypoints.
-     * Google Directions API hard limit: 23 intermediate waypoints (+ origin +
-     * dest = 25 total). Self-healing removes lowest-scoring waypoint on
-     * rejection, not highest-detour.
-     */
+    private LatLng findPointAtDistance(List<LatLng> path, double target) {
+        double cum = 0;
+        for (int i = 0; i < path.size() - 1; i++) {
+            double seg = haversine(path.get(i).lat, path.get(i).lng, path.get(i + 1).lat, path.get(i + 1).lng);
+            if (cum + seg >= target) {
+                double fraction = (target - cum) / seg;
+                double lat = path.get(i).lat + fraction * (path.get(i + 1).lat - path.get(i).lat);
+                double lng = path.get(i).lng + fraction * (path.get(i + 1).lng - path.get(i).lng);
+                return new LatLng(lat, lng);
+            }
+            cum += seg;
+        }
+        return path.get(path.size() - 1);
+    }
+
     /**
      * Fetch route details with self-healing that removes problematic waypoints.
      * Google Directions API hard limit: 23 intermediate waypoints (+ origin +
@@ -785,7 +824,7 @@ public class RouteBeautifierService {
                         if (gSpent + companionCost > totalTimeBudget) {
                             continue;
                         }
-                        
+
                         // Skip if same name as anchor or another already-selected spot within 5km
                         boolean isDuplicate = finalSelection.stream()
                                 .anyMatch(selected
@@ -799,7 +838,7 @@ public class RouteBeautifierService {
                         }
 
                         companion.setSegmentIndex(seg);
-                        
+
                         if (DebugConfig.SHOW_SELECTION_DEBUG) {
                             String src = companion.getSearchSource() != null ? companion.getSearchSource() : "";
                             companion.setSelectionDebugCode(companionPhase + (src.isEmpty() ? "" : "/" + src));
@@ -1075,7 +1114,8 @@ public class RouteBeautifierService {
 
                             // Filter 1: name must contain at least one include keyword
                             boolean nameMatch = includeKeywords.stream()
-                                    .anyMatch(kw -> spot.getName().toLowerCase().contains(kw.toLowerCase()));
+                                    .anyMatch(kw -> java.util.Arrays.stream(kw.toLowerCase().split("\\s+"))
+                                    .anyMatch(word -> word.length() > 2 && spot.getName().toLowerCase().contains(word)));
                             if (!nameMatch) {
                                 log.info("Pass 0: name filter rejected: {}", spot.getName());
                                 continue;
@@ -1338,6 +1378,10 @@ public class RouteBeautifierService {
                 continue;
             }
             if (seenPlaceIds.contains(spot.getPlaceId())) {
+                continue;
+            }
+            if (spot.getEntityType() != null && MeandrConstants.EXCLUDED_PLACE_TYPES.stream()
+                    .anyMatch(t -> spot.getEntityType().toLowerCase().contains(t))) {
                 continue;
             }
             seenPlaceIds.add(spot.getPlaceId());

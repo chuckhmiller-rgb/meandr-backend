@@ -6,8 +6,10 @@ import lombok.NoArgsConstructor;
 /**
  * Represents a Google Places candidate ready for scoring.
  */
+
 @Data
 @NoArgsConstructor
+
 public class GooglePlaceCandidate {
 
     private String placeId;

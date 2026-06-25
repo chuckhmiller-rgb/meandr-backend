@@ -105,6 +105,7 @@ com/meandr/meandrDataServices/mapper/UsersModelMapper.class
 com/meandr/meandrDataServices/osm/model/OsmSearchRequest.class
 com/meandr/meandrDataServices/model/UserRoute$UserRouteBuilder.class
 com/meandr/meandrDataServices/dto/ClimbingGymResponseDto.class
+com/meandr/meandrDataServices/dto/RestStopDto.class
 com/meandr/meandrDataServices/dto/UpdateRouteRequestDto.class
 com/meandr/meandrDataServices/dto/RouteStepSummaryDto.class
 com/meandr/meandrDataServices/repository/UsersRepository.class

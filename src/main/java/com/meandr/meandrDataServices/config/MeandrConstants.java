@@ -16,7 +16,7 @@ public class MeandrConstants {
             "gym", "fitness_center", "health",
             "store", "shop", "shopping_mall", "supermarket", "grocery_store",
             "clothing_store", "furniture_store", "electronics_store",
-            "home_goods_store", "hardware_store", "notary"
+            "home_goods_store", "hardware_store", "notary", "apartment", "apartments"
     );
     
     public static final List<String> MOST_RELEVANT_TYPES = List.of(
