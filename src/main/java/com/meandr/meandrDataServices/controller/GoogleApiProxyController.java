@@ -5,6 +5,7 @@
 package com.meandr.meandrDataServices.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meandr.meandrDataServices.config.MeandrConstants;
 import com.meandr.meandrDataServices.dto.CoordinateDto;
 import com.meandr.meandrDataServices.model.ScenicSpot;
@@ -39,21 +40,24 @@ import org.springframework.web.client.RestClientException;
 
 import org.springframework.cache.annotation.Cacheable;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  *
  * @author chuck
  */
 @CrossOrigin(origins = "https://meandr-app.vercel.app")
-@RestController
-@RequestMapping("/api/places")
 @Slf4j
+@RestController
+@RequestMapping("/api/v1/places")
+@RequiredArgsConstructor
 public class GoogleApiProxyController {
 
     @Value("${google.api.key}")
@@ -62,8 +66,6 @@ public class GoogleApiProxyController {
     private static final Set<String> EXCLUDED_PLACE_TYPES = MeandrConstants.EXCLUDED_PLACE_TYPES;
     private static final List<String> MOST_RELEVANT_TYPES = MeandrConstants.MOST_RELEVANT_TYPES;
     private static final Map<String, String> ENTITY_KEYWORDS = MeandrConstants.ENTITY_KEYWORDS;
-    
-    
 
     @Autowired
     private PlacesCacheService placesCacheService;
@@ -326,6 +328,117 @@ public class GoogleApiProxyController {
         } catch (RestClientException e) {
             log.error("Error calling Google Places API: " + e.getMessage());
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/rest-stop/nearby")
+    public ResponseEntity<List<Map<String, Object>>> restStopNearby(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "15000") int radius) {
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Goog-Api-Key", apiKey);
+        headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours");
+
+        List<String> includedTypes = List.of(
+                "restaurant", "cafe", "bar", "bakery", "brewery", "winery",
+                "beer_garden", "farmers_market", "night_club", "meal_takeaway",
+                "gas_station", "lodging", "convenience_store", "rest_stop",
+                "electric_vehicle_charging_station", "campground", "rv_park"
+        );
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("includedTypes", includedTypes);
+        requestBody.put("maxResultCount", 20);
+        requestBody.put("rankPreference", "POPULARITY");
+        requestBody.put("locationRestriction", Map.of(
+                "circle", Map.of(
+                        "center", Map.of("latitude", lat, "longitude", lng),
+                        "radius", (double) radius
+                )
+        ));
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    placesNearbyUrl, HttpMethod.POST, entity, String.class
+            );
+
+            String responseBody = response.getBody();
+            log.info("Raw Google Places response: {}", responseBody);
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(response.getBody());
+            JsonNode places = root.path("places");
+
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (JsonNode place : places) {
+                Map<String, Object> p = new HashMap<>();
+                p.put("placeId", place.path("id").asText());
+                p.put("name", place.path("displayName").path("text").asText());
+                p.put("address", place.path("formattedAddress").asText());
+                p.put("lat", place.path("location").path("latitude").asDouble());
+                p.put("lng", place.path("location").path("longitude").asDouble());
+                p.put("rating", place.path("rating").asDouble());
+                p.put("userRatingsTotal", place.path("userRatingCount").asInt());
+
+                JsonNode hours = places.path("regularOpeningHours");
+                if (hours.isMissingNode()) {
+                    hours = place.path("regularOpeningHours");
+                }
+                p.put("openingHoursJson", hours.isMissingNode() ? null : hours.toString());
+
+                log.info("place: {}, hours missing: {}, hours: {}",
+                        place.path("displayName").path("text").asText(),
+                        hours.isMissingNode(),
+                        hours.toString());
+
+                // Map Google type to your entityType
+                String entityType = "restaurant";
+                for (JsonNode type : place.path("types")) {
+                    String t = type.asText();
+                    if (t.equals("gas_station") || t.equals("convenience_store")) {
+                        entityType = "gas";
+                        break;
+                    }
+                    if (t.equals("lodging")) {
+                        entityType = "lodging";
+                        break;
+                    }
+                    if (t.equals("electric_vehicle_charging_station")) {
+                        entityType = "charging_station";
+                        break;
+                    }
+                    if (t.equals("campground") || t.equals("rv_park")) {
+                        entityType = "campground";
+                        break;
+                    }
+                    if (t.equals("rest_area")) {
+                        entityType = "rest_stop";
+                        break;
+                    }
+                    if (t.equals("bar") || t.equals("night_club") || t.equals("brewery")) {
+                        entityType = "bar";
+                        break;
+                    }
+                    if (t.equals("cafe") || t.equals("bakery") || t.equals("winery")) {
+                        entityType = "cafe";
+                        break;
+                    }
+                }
+                p.put("entityType", entityType);
+
+                results.add(p);
+            }
+
+            return ResponseEntity.ok(results);
+
+        } catch (Exception e) {
+            log.error("Error calling rest stop nearby search: {}", e.getMessage());
+            return ResponseEntity.status(500).body(null);
         }
     }
 

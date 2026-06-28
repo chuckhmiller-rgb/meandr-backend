@@ -132,11 +132,11 @@ public class RouteBeautifierService {
             boolean avoidTolls,
             boolean excludeOrigin,
             boolean excludeDest,
+            String restStopCadence,
             int dwellTimePerStop,
             List<List<Double>> selectedRouteCoords,
             List<String> includeKeywords,
-            List<String> excludeKeywords,
-            String restStopCadence
+            List<String> excludeKeywords
     ) throws Exception {
 
         log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, hasSelectedCoords={}",
@@ -248,7 +248,7 @@ public class RouteBeautifierService {
         log.info("Decoded route into {} coordinate points", routeCoords.size());
 
         return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
-                radius, entityPreferences, excludeOrigin, excludeDest, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords, restStopCadence);
+                radius, entityPreferences, excludeOrigin, excludeDest, restStopCadence, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords);
     }
 
     public Map<String, Object> routeWithWaypoints(
@@ -347,6 +347,7 @@ public class RouteBeautifierService {
      * @param routeEnhancementThreshold
      * @param radius
      * @param entityPreferences
+     * @param restStopCadence
      * @param dwellTimePerStop
      * @param encodedPolyline
      * @param excludeOrigin
@@ -355,7 +356,6 @@ public class RouteBeautifierService {
      * @param avoidTolls
      * @param includeKeywords
      * @param excludeKeywords
-     * @param restStopCadence
      * @return
      */
     public BeautifiedRouteResponseDto beautifyRoute(
@@ -366,13 +366,13 @@ public class RouteBeautifierService {
             List<String> entityPreferences,
             boolean excludeOrigin,
             boolean excludeDest,
+            String restStopCadence,
             int dwellTimePerStop,
             String encodedPolyline,
             boolean avoidHighways,
             boolean avoidTolls,
             List<String> includeKeywords,
-            List<String> excludeKeywords,
-            String restStopCadence
+            List<String> excludeKeywords
     ) {
         List<LatLng> path = routeCoords.stream()
                 .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
@@ -500,6 +500,7 @@ public class RouteBeautifierService {
                 routing.getSteps(),
                 totalDetourMins,
                 baselineDurationMins,
+                restStopCadence,
                 routeEnhancementThreshold,
                 warningMessage,
                 restStopZones

@@ -35,6 +35,7 @@ public class SecurityConfig {
                         "/api/v1/auth/login",
                         "/api/v1/route/**",
                         "/api/v1/waypoint-photos/**",
+                        "/api/v1/places/**",
                         "/api/v1/maps/**",
                         "/api/v1/osm/**",
                         "/api/places/**",

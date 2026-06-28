@@ -22,6 +22,7 @@ public class BeautifiedRouteResponseDto {
     private String originName;
     private String destinationName;
     private int dwellTimePerStop;
+    private String restStopCadence;
     private double routeEnhancementThreshold;
     private boolean avoidHighways;
     private boolean avoidTolls;
@@ -46,6 +47,7 @@ public class BeautifiedRouteResponseDto {
             List<RouteStepSummaryDto> beautifiedRoute,
             double totalDetourMins,
             long originalDurationMins,
+            String restStopCadence,
             double routeEnhancementThreshold,
             String warningMessage,
             List<Map<String, Double>> restStopZones) {
@@ -53,6 +55,7 @@ public class BeautifiedRouteResponseDto {
         this.waypointCount = waypointCount;
         this.masterPolyline = masterPolyline;
         this.routeDebugUrl = routeDebugUrl;
+        this.restStopCadence = restStopCadence;
         this.selectedWaypoints = selectedWaypoints;
         this.rejectedWaypoints = rejectedWaypoints;
         this.beautifiedRoute = beautifiedRoute;

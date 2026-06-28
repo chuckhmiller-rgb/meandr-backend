@@ -94,11 +94,11 @@ public class RouteBeautifierController {
                 request.isAvoidTolls(),
                 request.isExcludeOrigin(),
                 request.isExcludeDest(),
+                request.getRestStopCadence(),
                 request.getDwellTimePerStop(),
                 request.getSelectedRouteCoords(),
                 request.getIncludeKeywords(),
-                request.getExcludeKeywords(),
-                request.getRestStopCadence()
+                request.getExcludeKeywords()
         );
 
         // Echo request parameters back in response
