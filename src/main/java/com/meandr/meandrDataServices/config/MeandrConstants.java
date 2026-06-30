@@ -13,10 +13,11 @@ public class MeandrConstants {
             "physiotherapist", "accounting", "storage", "moving_company",
             "car_dealer", "car_repair", "car_wash", "laundry", "post_office", "restaurant",
             "spa", "beauty_salon", "hair_salon", "nail_salon",
-            "gym", "fitness_center", "health",
-            "store", "shop", "shopping_mall", "supermarket", "grocery_store",
+            "gym", "fitness_center",
+            "store", "shopping_mall", "supermarket", "grocery_store",
             "clothing_store", "furniture_store", "electronics_store",
-            "home_goods_store", "hardware_store", "notary", "apartment", "apartments"
+            "home_goods_store", "hardware_store"
+            //, "apartments", "shop", "health", "notary", "health", "apartment"
     );
     
     public static final List<String> MOST_RELEVANT_TYPES = List.of(

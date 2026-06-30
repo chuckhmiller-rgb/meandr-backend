@@ -374,6 +374,8 @@ public class RouteBeautifierService {
             List<String> includeKeywords,
             List<String> excludeKeywords
     ) {
+        
+        long beautifyStart = System.currentTimeMillis();
         List<LatLng> path = routeCoords.stream()
                 .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
                 .collect(Collectors.toList());
@@ -458,15 +460,15 @@ public class RouteBeautifierService {
         }
 
         // Compute rest stop zones from final polyline
+        long rszStart = System.currentTimeMillis();
+
+// Compute rest stop zones from final polyline
         List<Map<String, Double>> restStopZones = new ArrayList<>();
         if (restStopCadence != null && !restStopCadence.equals("none")) {
             String finalPolyline = routing.getPolyline().isEmpty() ? encodedPolyline : routing.getPolyline();
             List<LatLng> polylinePath = PolylineEncoding.decode(finalPolyline).stream()
                     .map(ll -> new LatLng(ll.lat, ll.lng))
                     .collect(Collectors.toList());
-
-            log.info("Polyline size is {})",
-                    routing.steps.size());
 
             int denom = switch (restStopCadence) {
                 case "midpoint" ->
@@ -475,8 +477,12 @@ public class RouteBeautifierService {
                     3;
                 case "quarters" ->
                     4;
-                default ->
+                case "eighths" ->
                     8;
+                case "tenths" ->
+                    10;
+                default ->
+                    0;
             };
 
             double totalLen = 0;
@@ -490,6 +496,8 @@ public class RouteBeautifierService {
                 restStopZones.add(Map.of("lat", pt.lat, "lng", pt.lng, "distFromStart", distFromStart));
             }
         }
+
+        log.info("Rest stop zone computation took {}ms", System.currentTimeMillis() - rszStart);
 
         BeautifiedRouteResponseDto dto = new BeautifiedRouteResponseDto(
                 actualWaypoints.size(),
@@ -506,6 +514,7 @@ public class RouteBeautifierService {
                 restStopZones
         );
 
+        log.info("Total beautifyRoute took {}ms", System.currentTimeMillis() - beautifyStart);
         return dto;
     }
 

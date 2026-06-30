@@ -83,7 +83,9 @@ public class GoogleApiProxyController {
     public String cacheKey(double lat, double lng, double radius, List<String> entityTypes) {
         double gridLat = Math.round(lat / 0.05) * 0.05;
         double gridLng = Math.round(lng / 0.05) * 0.05;
-        String types = entityTypes.stream().sorted().collect(Collectors.joining(","));
+        String types = (entityTypes == null || entityTypes.isEmpty())
+                ? "none"
+                : entityTypes.stream().sorted().collect(Collectors.joining(","));
         return String.format("%.2f|%.2f|%.0f|%s", gridLat, gridLng, radius, types);
     }
 
@@ -207,7 +209,13 @@ public class GoogleApiProxyController {
         }
     }
 
+    @Cacheable(
+            value = "scenicSpots",
+            key = "#root.target.cacheKey(#lat, #lng, #radius, #entityTypes)"
+    )
     public List<ScenicSpot> searchTextScenic(double lat, double lng, int radius, String keyword, List<String> googleTypes) { // --- Tier 1: MySQL persistent cache ---
+
+        
 
         // --- Tier 1: MySQL persistent cache ---
         List<ScenicSpot> cached = placesCacheService.findNearby(lat, lng, radius, googleTypes);
@@ -234,7 +242,7 @@ public class GoogleApiProxyController {
         headers.set("X-Goog-Api-Key", apiKey);
         headers.set("X-Goog-FieldMask",
                 "places.id,places.displayName,places.formattedAddress,places.types,"
-                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours");
+                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.evChargeOptions");
 
         try {
             JsonNode response = restTemplate.postForObject(
@@ -306,7 +314,7 @@ public class GoogleApiProxyController {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Api-Key", apiKey);
         // The FieldMask is REQUIRED. This defines what data you get back.
-        headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount");
+        headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.evChargeOptions");
 
         requestBody.put("rankPreference", "POPULARITY");
 
@@ -368,7 +376,7 @@ public class GoogleApiProxyController {
             );
 
             String responseBody = response.getBody();
-            log.info("Raw Google Places response: {}", responseBody);
+            log.debug("Raw Google Places response: {}", responseBody);
 
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(response.getBody());
@@ -510,7 +518,7 @@ public class GoogleApiProxyController {
         headers.set("X-Goog-Api-Key", apiKey);
         headers.set("X-Goog-FieldMask",
                 "places.id,places.displayName,places.formattedAddress,places.types,"
-                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours");
+                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.evChargeOptions");
 
         try {
             JsonNode response = restTemplate.postForObject(

@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.springframework.cache.annotation.Cacheable;
 
 @Slf4j
 @Service
