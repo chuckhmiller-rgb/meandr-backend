@@ -464,10 +464,9 @@ public class RouteBeautifierService {
             List<LatLng> polylinePath = PolylineEncoding.decode(finalPolyline).stream()
                     .map(ll -> new LatLng(ll.lat, ll.lng))
                     .collect(Collectors.toList());
-            
+
             log.info("Polyline size is {})",
                     routing.steps.size());
-                    
 
             int denom = switch (restStopCadence) {
                 case "midpoint" ->
@@ -486,8 +485,9 @@ public class RouteBeautifierService {
                         polylinePath.get(i + 1).lat, polylinePath.get(i + 1).lng);
             }
             for (int s = 1; s < denom; s++) {
-                LatLng pt = findPointAtDistance(polylinePath, totalLen * s / denom);
-                restStopZones.add(Map.of("lat", pt.lat, "lng", pt.lng));
+                double distFromStart = totalLen * s / denom;
+                LatLng pt = findPointAtDistance(polylinePath, distFromStart);
+                restStopZones.add(Map.of("lat", pt.lat, "lng", pt.lng, "distFromStart", distFromStart));
             }
         }
 

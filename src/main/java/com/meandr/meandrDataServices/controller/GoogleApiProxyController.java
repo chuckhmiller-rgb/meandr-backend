@@ -391,7 +391,7 @@ public class GoogleApiProxyController {
                 }
                 p.put("openingHoursJson", hours.isMissingNode() ? null : hours.toString());
 
-                log.info("place: {}, hours missing: {}, hours: {}",
+                log.debug("place: {}, hours missing: {}, hours: {}",
                         place.path("displayName").path("text").asText(),
                         hours.isMissingNode(),
                         hours.toString());
