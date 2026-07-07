@@ -139,8 +139,8 @@ public class RouteBeautifierService {
             List<String> excludeKeywords
     ) throws Exception {
 
-        log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, hasSelectedCoords={}",
-                routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest,
+        log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, includeKeywords={}, excludeKeywords={}, entityPreferences={}, hasSelectedCoords={}",
+                routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest, includeKeywords, excludeKeywords, entityPreferences,
                 selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
 
         if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
@@ -481,6 +481,8 @@ public class RouteBeautifierService {
                     8;
                 case "tenths" ->
                     10;
+                case "twelfths" ->
+                    12;
                 default ->
                     0;
             };

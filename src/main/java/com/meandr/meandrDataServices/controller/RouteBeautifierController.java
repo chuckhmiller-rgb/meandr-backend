@@ -70,7 +70,7 @@ public class RouteBeautifierController {
             @RequestBody BeautifyRequestDto request) throws Exception {
 
         log.debug("Request body: {}", new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request));
-        log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={} avoidTolls={} excludeOrigin={} excludeDest={} includeKeywords={}, excludeKeywords={}",
+        log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={} avoidTolls={} excludeOrigin={} excludeDest={} entityPreferences{} includeKeywords={}, excludeKeywords={}",
                 request.getOrigin().getLat(), 
                 request.getOrigin().getLng(),
                 request.getDestination().getLat(), 
@@ -80,6 +80,7 @@ public class RouteBeautifierController {
                 request.isAvoidTolls(),
                 request.isExcludeOrigin(),
                 request.isExcludeDest(),
+                request.getEntityPreferences(),
                 request.getIncludeKeywords(),
                 request.getExcludeKeywords(),
                 request.getRestStopCadence());
