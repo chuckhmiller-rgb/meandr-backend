@@ -89,6 +89,12 @@ public class UserRoute {
 
     @Column(name = "rejected_stops", columnDefinition = "JSON")
     private String rejectedStops;
+    
+    @Column(name = "rest_stop_zones", columnDefinition = "JSON")
+    private String restStopZones;
+    
+    @Column(name = "rest_stop_cadence", columnDefinition = "TEXT")
+    private String restStopCadence;
 
     @Column(nullable = false)
     private boolean deleted = false;

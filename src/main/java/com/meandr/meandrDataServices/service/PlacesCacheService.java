@@ -31,6 +31,8 @@ public class PlacesCacheService {
         spot.setEntityType(rs.getString("entity_type"));
         spot.setAddress(rs.getString("address"));
         spot.setOpeningHoursJson(rs.getString("opening_hours_json"));
+        int utcOffset = rs.getInt("utc_offset_minutes");
+        spot.setUtcOffsetMinutes(rs.wasNull() ? null : utcOffset);
         return spot;
     };
 
@@ -52,7 +54,7 @@ public class PlacesCacheService {
             // Skip entity type filter — return all cached spots in radius
             String sql = String.format("""
             SELECT place_id, name, lat, lng, rating, user_ratings_total,
-                   entity_type, address, opening_hours_json
+                   entity_type, address, opening_hours_json, utc_offset_minutes
             FROM places_cache
             WHERE lat BETWEEN ? AND ?
               AND lng BETWEEN ? AND ?
@@ -69,7 +71,7 @@ public class PlacesCacheService {
 
         String sql = String.format("""
                 SELECT place_id, name, lat, lng, rating, user_ratings_total,
-                       entity_type, address, opening_hours_json
+                       entity_type, address, opening_hours_json, utc_offset_minutes
                 FROM places_cache
                 WHERE lat BETWEEN ? AND ?
                   AND lng BETWEEN ? AND ?
@@ -87,12 +89,13 @@ public class PlacesCacheService {
         String sql = """
                 INSERT INTO places_cache
                     (place_id, name, lat, lng, rating, user_ratings_total,
-                     entity_type, address, opening_hours_json, cached_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                     entity_type, address, opening_hours_json, utc_offset_minutes, cached_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
                     rating              = VALUES(rating),
                     user_ratings_total  = VALUES(user_ratings_total),
                     opening_hours_json  = VALUES(opening_hours_json),
+                    utc_offset_minutes  = VALUES(utc_offset_minutes),
                     cached_at           = NOW()
                 """;
 
@@ -110,7 +113,8 @@ public class PlacesCacheService {
                     spot.getUserRatingsTotal(),
                     spot.getEntityType(),
                     spot.getAddress(),
-                    spot.getOpeningHoursJson()
+                    spot.getOpeningHoursJson(),
+                    spot.getUtcOffsetMinutes()
             );
             saved++;
         }

@@ -23,6 +23,8 @@ public class GooglePlaceCandidate {
     private Double detourMinutes;
     private Double distFromStart;
     private String openingHoursJson;
+    private Integer utcOffsetMinutes;
+    
     /**
      * Tracks how and when this place was found and selected during route
      * beautification.

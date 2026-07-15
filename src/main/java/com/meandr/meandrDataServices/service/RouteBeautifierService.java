@@ -1266,6 +1266,7 @@ public class RouteBeautifierService {
             c.setDistFromStart(s.getDistFromStart());
             c.setEntityType(s.getEntityType());
             c.setOpeningHoursJson(s.getOpeningHoursJson());
+            c.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
             c.setSelectionDebugCode(s.getSearchSource());
             c.setSearchSource(s.getSearchSource());
             return c;
@@ -1306,6 +1307,7 @@ public class RouteBeautifierService {
                 spot.setLat(sw.getLatitude() != null ? sw.getLatitude() : 0.0);
                 spot.setLng(sw.getLongitude() != null ? sw.getLongitude() : 0.0);
                 spot.setOpeningHoursJson(sw.getOpeningHoursJson());
+                spot.setUtcOffsetMinutes(sw.getUtcOffsetMinutes());
                 spot.setRating(sw.getRating() != null ? sw.getRating() : 0.0);
                 spot.setUserRatingsTotal(sw.getUserRatingCount() != null ? sw.getUserRatingCount() : 0);
                 spot.setScore(sw.getScore());

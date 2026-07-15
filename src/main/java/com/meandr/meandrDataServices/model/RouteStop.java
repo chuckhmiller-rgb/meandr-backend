@@ -10,6 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RouteStop {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -43,6 +44,12 @@ public class RouteStop {
 
     @Column(name = "reviews_total")
     private Integer reviewsTotal;
+
+    @Column(name = "opening_hours_json", columnDefinition = "TEXT")
+    private String openingHoursJson;
+    
+    @Column(name = "utc_offset_minutes", columnDefinition = "TEXT")
+    private String utcOffsetMinutes;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")

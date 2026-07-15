@@ -32,6 +32,8 @@ public class ScoredWaypoint {
     private Double longitude;
     private String address;
     private String openingHoursJson;
+    private Integer utcOffsetMinutes;
+    
 
     // Display metadata
     private String entityType;   // Google type string or OsmEntityType.name()
@@ -92,6 +94,7 @@ public class ScoredWaypoint {
         w.longitude = c.getLongitude();
         w.address = c.getAddress();
         w.openingHoursJson = c.getOpeningHoursJson();
+        w.utcOffsetMinutes = c.getUtcOffsetMinutes();
         w.entityType = c.getEntityType();
         //log.info("fromGoogle: {} entityType={} candidate.entityType={}", 
         //c.getName(), w.entityType, c.getEntityType());

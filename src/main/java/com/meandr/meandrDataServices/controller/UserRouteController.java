@@ -58,6 +58,10 @@ public class UserRouteController {
                 .rejectedStops(request.getRejectedStops() != null
                         ? new ObjectMapper().writeValueAsString(request.getRejectedStops())
                         : null)
+                .restStopZones(request.getRestStopZones() != null
+                        ? new ObjectMapper().writeValueAsString(request.getRestStopZones())
+                        : null)
+                .restStopCadence(request.getRestStopCadence())
                 .isSaved(false)
                 .build();
 
@@ -186,6 +190,12 @@ public class UserRouteController {
         if (body.getRejectedStops() != null) {
             route.setRejectedStops(new ObjectMapper().writeValueAsString(body.getRejectedStops()));
         }
+        if (body.getRestStopZones() != null) {
+            route.setRestStopZones(new ObjectMapper().writeValueAsString(body.getRestStopZones()));
+        }
+        if (body.getRestStopCadence() != null) {
+            route.setRestStopCadence(body.getRestStopCadence());
+        }
         // Replace stops
         route.getStops().clear(); // orphanRemoval handles the deletes
         if (body.getStops() != null) {
@@ -204,6 +214,8 @@ public class UserRouteController {
                         stop.setDetourMins(s.getDetourMins());
                         stop.setRating(s.getRating());
                         stop.setReviewsTotal(s.getReviewsTotal());
+                        stop.setOpeningHoursJson(s.getOpeningHoursJson());
+                        stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
                         return stop;
                     }).toList();
             route.getStops().addAll(newStops);
