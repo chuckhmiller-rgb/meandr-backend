@@ -77,7 +77,6 @@ public class GoogleApiProxyController {
     private final RestTemplate restTemplate = new RestTemplate();
 
     private String geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json";
-    
 
     @Autowired
     private CacheManager cacheManager;
@@ -416,21 +415,24 @@ public class GoogleApiProxyController {
         prefTypes = prefTypes.stream().distinct().collect(Collectors.toList());
 
         try {
-            for (String prefType : prefTypes) {
-                HttpHeaders textHeaders = new HttpHeaders();
-                textHeaders.setContentType(MediaType.APPLICATION_JSON);
-                textHeaders.set("X-Goog-Api-Key", apiKey);
-                textHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.utcOffsetMinutes,places.regularOpeningHours");
+            // Entity preference types via Nearby Search (type-restricted, not free text)
+            if (!prefTypes.isEmpty()) {
+                HttpHeaders nearbyHeaders = new HttpHeaders();
+                nearbyHeaders.setContentType(MediaType.APPLICATION_JSON);
+                nearbyHeaders.set("X-Goog-Api-Key", apiKey);
+                nearbyHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
 
-                Map<String, Object> textBody = new HashMap<>();
-                textBody.put("textQuery", prefType.replace("_", " "));
-                textBody.put("maxResultCount", 5);
-                textBody.put("locationRestriction", Map.of("rectangle", rectangle));
+                Map<String, Object> nearbyBody = new HashMap<>();
+                nearbyBody.put("includedTypes", prefTypes);
+                nearbyBody.put("maxResultCount", 20);
+                nearbyBody.put("locationRestriction", Map.of(
+                        "circle", Map.of("center", Map.of("latitude", lat, "longitude", lng), "radius", (double) radius)
+                ));
 
-                HttpEntity<Map<String, Object>> textEntity = new HttpEntity<>(textBody, textHeaders);
+                HttpEntity<Map<String, Object>> nearbyEntity = new HttpEntity<>(nearbyBody, nearbyHeaders);
                 try {
-                    ResponseEntity<String> textResponse = restTemplate.exchange(placesSearchTextUrl, HttpMethod.POST, textEntity, String.class);
-                    for (JsonNode place : mapper.readTree(textResponse.getBody()).path("places")) {
+                    ResponseEntity<String> nearbyResponse = restTemplate.exchange(placesSearchNearbyUrl, HttpMethod.POST, nearbyEntity, String.class);
+                    for (JsonNode place : mapper.readTree(nearbyResponse.getBody()).path("places")) {
                         String id = place.path("id").asText();
                         if (!seenIds.contains(id)) {
                             Map<String, Object> p = mapPlace(place, true);
@@ -441,15 +443,16 @@ public class GoogleApiProxyController {
                         }
                     }
                 } catch (Exception ex) {
-                    log.warn("Text search failed for prefType {}: {}", prefType, ex.getMessage());
+                    log.warn("Nearby search failed for prefTypes {}: {}", prefTypes, ex.getMessage());
                 }
             }
 
+            // Include keyword searches — free text, kept as Text Search
             for (String keyword : includeKeywords) {
                 HttpHeaders textHeaders = new HttpHeaders();
                 textHeaders.setContentType(MediaType.APPLICATION_JSON);
                 textHeaders.set("X-Goog-Api-Key", apiKey);
-                textHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.utcOffsetMinutes,places.regularOpeningHours");
+                textHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
 
                 Map<String, Object> textBody = new HashMap<>();
                 textBody.put("textQuery", keyword);

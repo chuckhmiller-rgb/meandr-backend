@@ -29,12 +29,13 @@ public class BeautifiedRouteResponseDto {
     private boolean excludeOrigin;
     private boolean excludeDest;
     private List<String> entityPreferences;
+    private List<String> includeKeywords;
+    private List<String> excludeKeywords;
     private TripSummary summary;
     private String warningMessage;
     private List<Map<String, Double>> restStopZones = new ArrayList<>();
-    
-    //private List<RestStopDto> restStops;
 
+    //private List<RestStopDto> restStops;
     /**
      * Single constructor — covers both standard and enhanced routes.
      */
@@ -61,8 +62,6 @@ public class BeautifiedRouteResponseDto {
         this.beautifiedRoute = beautifiedRoute;
         this.warningMessage = warningMessage;
         this.restStopZones = restStopZones;
-        
-        
 
         double enhancementBudgetMins = originalDurationMins * (routeEnhancementThreshold / 100.0);
 

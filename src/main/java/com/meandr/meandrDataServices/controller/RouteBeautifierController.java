@@ -1,4 +1,3 @@
-
 package com.meandr.meandrDataServices.controller;
 
 import com.meandr.meandrDataServices.dto.BeautifiedRouteResponseDto;
@@ -71,9 +70,9 @@ public class RouteBeautifierController {
 
         log.debug("Request body: {}", new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request));
         log.info("Beautifying route: origin={},{} dest={},{} enhancement={}% avoidHighways={} avoidTolls={} excludeOrigin={} excludeDest={} entityPreferences{} includeKeywords={}, excludeKeywords={}",
-                request.getOrigin().getLat(), 
+                request.getOrigin().getLat(),
                 request.getOrigin().getLng(),
-                request.getDestination().getLat(), 
+                request.getDestination().getLat(),
                 request.getDestination().getLng(),
                 request.getRouteEnhancementThreshold(),
                 request.isAvoidHighways(),
@@ -110,6 +109,8 @@ public class RouteBeautifierController {
         response.setExcludeOrigin(request.isExcludeOrigin());
         response.setExcludeDest(request.isExcludeDest());
         response.setEntityPreferences(request.getEntityPreferences());
+        response.setIncludeKeywords(request.getIncludeKeywords());
+        response.setExcludeKeywords(request.getExcludeKeywords());
         response.setDwellTimePerStop(request.getDwellTimePerStop());
         response.setRouteEnhancementThreshold(request.getRouteEnhancementThreshold());
 
