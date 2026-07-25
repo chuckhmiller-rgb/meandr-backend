@@ -24,7 +24,7 @@ public class MeandrConstants {
             // Most specific natural/outdoor types first
             "national_park", "state_park", "wildlife_refuge", "wildlife_park",
             "botanical_garden", "dog_park", "campground", "rv_park",
-            "hiking_area", "picnic_ground", "off_roading_area", "adventure_sports_center",
+            "hiking_area", "picnic_ground", "off_roading_area", "adventure_sports_center", 
             // Water
             "beach", "marina",
             // Animals
@@ -34,12 +34,8 @@ public class MeandrConstants {
             "history_museum", "art_museum", "museum", "art_gallery",
             "historical_landmark", "cultural_landmark", "historical_place",
             "performing_arts_theater", "library",
-            // Food & Drink (specific before generic)
-            "brewery", "brewpub", "beer_garden", "vineyard",
-            "cocktail_bar", "bar", "night_club",
-            "bakery", "coffee_shop", "cafe",
-            "fast_food_restaurant", "restaurant",
-            "market",
+            // Broad types last
+            "tourist_attraction", "park", "city_park", "natural_feature",
             // Entertainment
             "amusement_park", "observation_deck",
             // Civic
@@ -47,10 +43,15 @@ public class MeandrConstants {
             "courthouse", "city_hall", "plaza", "town_square",
             // Worship
             "church", "synagogue", "mosque", "hindu_temple",
+            // Food & Drink (specific before generic)
+            "brewery", "brewpub", "beer_garden", "vineyard",
+            "cocktail_bar", "bar", "night_club",
+            "bakery", "coffee_shop", "cafe",
+            "fast_food_restaurant", "restaurant",
+            "market",
             // Rest & Refuel
-            "lodging", "gas_station", "convenience_store", "rest_stop",
-            // Broad types last
-            "tourist_attraction", "park", "city_park", "natural_feature"
+            "lodging", "gas_station", "convenience_store", "rest_stop"
+            
     );
 
     public static final Map<String, String> ENTITY_KEYWORDS = Map.ofEntries(
@@ -80,5 +81,6 @@ public class MeandrConstants {
             Map.entry("FARMERS_MARKET", "farmers market local market"),
             Map.entry("MILESTONE", "historic marker milestone"),
             Map.entry("WAYSIDE_SHRINE", "wayside shrine roadside shrine")
+            
     );
 }
