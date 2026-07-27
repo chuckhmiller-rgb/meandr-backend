@@ -80,6 +80,7 @@ public class UserRouteController {
                         stop.setEntityType(s.getEntityType());
                         stop.setDetourMins(s.getDetourMins());
                         stop.setRating(s.getRating());
+                        stop.setDistFromStart(s.getDistFromStart());
                         stop.setReviewsTotal(s.getReviewsTotal());
                         stop.setRoute(route);
                         return stop;
@@ -213,6 +214,7 @@ public class UserRouteController {
                         stop.setPlaceAddress(s.getPlaceAddress());
                         stop.setDetourMins(s.getDetourMins());
                         stop.setRating(s.getRating());
+                        stop.setDistFromStart(s.getDistFromStart());
                         stop.setReviewsTotal(s.getReviewsTotal());
                         stop.setOpeningHoursJson(s.getOpeningHoursJson());
                         stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());

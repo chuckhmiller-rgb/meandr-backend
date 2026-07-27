@@ -27,5 +27,6 @@ public class UpdateRouteRequestDto {
         private Integer reviewsTotal;
         private String openingHoursJson;
         private String utcOffsetMinutes;
+        private Double distFromStart;
     }
 }

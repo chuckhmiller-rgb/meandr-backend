@@ -47,9 +47,12 @@ public class RouteStop {
 
     @Column(name = "opening_hours_json", columnDefinition = "TEXT")
     private String openingHoursJson;
-    
+
     @Column(name = "utc_offset_minutes", columnDefinition = "TEXT")
     private String utcOffsetMinutes;
+
+    @Column(name = "dist_from_start")
+    private Double distFromStart;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")

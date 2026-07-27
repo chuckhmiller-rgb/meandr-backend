@@ -31,6 +31,7 @@ public class SaveRouteRequestDto {
     private List<StopDto> rejectedStops;
     private List<Map<String, Double>> restStopZones;
     private String restStopCadence;
+    
 
     @Data
     @NoArgsConstructor
@@ -46,6 +47,7 @@ public class SaveRouteRequestDto {
         private Integer reviewsTotal;
         private String openingHoursJson;
         private String utcOffsetMinutes;
+        private Double distFromStart;
         
     }
 }
