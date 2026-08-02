@@ -48,6 +48,8 @@ public class SaveRouteRequestDto {
         private String openingHoursJson;
         private String utcOffsetMinutes;
         private Double distFromStart;
+        private Boolean isRestZoneAddition;
+        private Boolean isManuallyAdded;
         
     }
 }

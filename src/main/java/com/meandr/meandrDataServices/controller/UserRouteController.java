@@ -81,6 +81,8 @@ public class UserRouteController {
                         stop.setDetourMins(s.getDetourMins());
                         stop.setRating(s.getRating());
                         stop.setDistFromStart(s.getDistFromStart());
+                        stop.setOpeningHoursJson(s.getOpeningHoursJson());
+                        stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
                         stop.setReviewsTotal(s.getReviewsTotal());
                         stop.setRoute(route);
                         return stop;
@@ -215,6 +217,8 @@ public class UserRouteController {
                         stop.setDetourMins(s.getDetourMins());
                         stop.setRating(s.getRating());
                         stop.setDistFromStart(s.getDistFromStart());
+                        stop.setIsRestZoneAddition(s.getIsRestZoneAddition());
+                        stop.setIsManuallyAdded(s.getIsManuallyAdded());
                         stop.setReviewsTotal(s.getReviewsTotal());
                         stop.setOpeningHoursJson(s.getOpeningHoursJson());
                         stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());

@@ -54,6 +54,12 @@ public class RouteStop {
     @Column(name = "dist_from_start")
     private Double distFromStart;
 
+    @Column(name = "is_rest_zone_addition")
+    private Boolean isRestZoneAddition;
+
+    @Column(name = "is_manually_added")
+    private Boolean isManuallyAdded;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
     @JsonIgnore
