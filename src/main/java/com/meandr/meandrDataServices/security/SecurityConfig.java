@@ -33,6 +33,8 @@ public class SecurityConfig {
                 .requestMatchers(
                         "/api/v1/users/register",
                         "/api/v1/auth/login",
+                        "/api/v1/auth/forgot-password",
+                        "/api/v1/auth/reset-password",
                         "/api/v1/route/**",
                         "/api/v1/waypoint-photos/**",
                         "/api/v1/places/**",
@@ -73,7 +75,7 @@ public class SecurityConfig {
                 "http://localhost:5173",
                 "https://meandr.app",
                 "https://meandr-app.vercel.app",
-                "https://miss-proarmy-nonfraternally.ngrok-free.dev", 
+                "https://miss-proarmy-nonfraternally.ngrok-free.dev",
                 "http://localhost:3000",
                 "http://127.0.0.1:5173"
         ));

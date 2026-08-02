@@ -7,6 +7,7 @@ export SWAGGER_PASSWORD=swaggerAdmin
 export DBUSERNAME=admin_user
 export DBPASSWORD=chuckisthegreatest
 
+export MAIL_APP_PASSWORD="mvkx slxu ozoa sbaa"
 
 export GOOGLE_API_KEY=AIzaSyCK_uoBzCecTdZT1PA4otCISJhjNhTATh0
 

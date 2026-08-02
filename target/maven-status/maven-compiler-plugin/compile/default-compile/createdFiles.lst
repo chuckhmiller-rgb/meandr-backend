@@ -9,6 +9,7 @@ com/meandr/meandrDataServices/GooglePlacesAPITester.class
 com/meandr/meandrDataServices/dto/BeautifyRequestDto.class
 com/meandr/meandrDataServices/dto/ParkResponseDto.class
 com/meandr/meandrDataServices/dto/CoordinateDto.class
+com/meandr/meandrDataServices/model/PasswordResetToken.class
 com/meandr/meandrDataServices/config/GoogleMapsConfig.class
 com/meandr/meandrDataServices/dto/UsersResponseDto$UsersResponseDtoBuilder.class
 com/meandr/meandrDataServices/service/RouteBeautifierService$LatLng.class
@@ -21,6 +22,7 @@ com/meandr/meandrDataServices/model/RouteStop.class
 com/meandr/meandrDataServices/osm/model/OsmSearchRequest$LatLng.class
 com/meandr/meandrDataServices/HelloServlet.class
 com/meandr/meandrDataServices/dto/ParkResponseDto$ParkResponseDtoBuilder.class
+com/meandr/meandrDataServices/service/PasswordResetService.class
 com/meandr/meandrDataServices/mapper/UsersFieldUpdateMapper.class
 com/meandr/meandrDataServices/dto/UsersUpdateDto.class
 com/meandr/meandrDataServices/scheduler/RouteCleanupScheduler.class
@@ -65,6 +67,7 @@ com/meandr/meandrDataServices/model/UserStatus.class
 com/meandr/meandrDataServices/service/RouteBeautifierService$RoutingResultWithWaypoints.class
 com/meandr/meandrDataServices/controller/GoogleApiProxyController.class
 com/meandr/meandrDataServices/service/EntityPreferenceService$PreferenceEntry.class
+com/meandr/meandrDataServices/controller/PasswordResetController.class
 com/meandr/meandrDataServices/model/ClimbingGym$ClimbingGymBuilder.class
 com/meandr/meandrDataServices/service/ParkService.class
 com/meandr/meandrDataServices/config/DebugConfig.class
@@ -83,6 +86,7 @@ com/meandr/meandrDataServices/dto/ClimbingGymResponseDto$ClimbingGymResponseDtoB
 com/meandr/meandrDataServices/dto/UserRouteSummaryDto.class
 com/meandr/meandrDataServices/repository/WaypointPhotoRepository.class
 com/meandr/meandrDataServices/repository/UserRouteRepository.class
+com/meandr/meandrDataServices/repository/PasswordResetTokenRepository.class
 com/meandr/meandrDataServices/dto/WaypointPhotoDto.class
 com/meandr/meandrDataServices/dto/RouteStepDetailDto.class
 com/meandr/meandrDataServices/ServletInitializer.class
