@@ -270,3 +270,18 @@
 2026-08-13T10:22:40.566-04:00  INFO 98881 --- [http-nio-8080-exec-9] c.m.m.c.GoogleApiProxyController         : Raw photos node for ChargePoint Charging Station: [{"name":"places/ChIJo-odPwl9iYgRmMS9KALRECo/photos/AWCwydjfKBZJEUIfRhhdFPBa1bMuAWA2BeL-j8oPiRhCjhlvVOqUoU8p1TIPTg2Xl0pcM3C7qWrDFqyj34xidAsWlitjYmHFr2Y_B8ayuoQEmjvbuSjIOdWArIljajUMSNjNmyXmjmwJiW3aCVTnA7FuSeqwBalf-4Wg8Jj8XWOGLEm7bo6Wr_GZcQuFQCjOtjFInqoCnbw6_zdshSqoYrOgqD6kOA77kFte9OXfQrbbH3nn0Dn02q12f5EblSUi9k0fpOKNhrJ4H9mnTjSq0ED7_akNVPbTB1XQQApTBjg8uvrr4_Yl5f1fREcsA8uuIseX2DlJ6IWNrFJnOpo_5VUDQd7v7D75o0Uq5eA9hn7MiIk9xqsLNmBEQdgKjOldXFmdiompLSA4yln254L1r1RpGSOVRhZaapJieBr3Gg1hTTeQ7ew-k0hVLfogAocFzHo1","widthPx":3024,"heightPx":4032,"authorAttributions":[{"displayName":"Christine Sims","uri":"https://maps.google.com/maps/contrib/107028894144614717343","photoUri":"https://lh3.googleusercontent.com/a-/ALV-UjVYiSCA_SuXGXu56-CX2mQnLNQHeGolavbPDzsoZT9K_HtbaDzquw=s100-p-k-no-mo"}],"flagContentUri":"https://www.google.com/local/content/rap/report?postId=!1e10!2sCIABIhD_1zFx2LIEnTm1yWZceguQ&t=27&cb_client=maps_api_places.places_api&hl=en-US","googleMapsUri":"https://www.google.com/maps/place//data=!3m4!1e2!3m2!1sCIABIhD_1zFx2LIEnTm1yWZceguQ!2e10!4m2!3m1!1s0x88897d093f1deaa3:0x2a10d10228bdc498"}]
 2026-08-13T10:22:40.626-04:00  INFO 98881 --- [http-nio-8080-exec-9] c.m.m.service.PlacesCacheService         : Saved 30 spots to places_cache
 2026-08-13T10:22:40.627-04:00  INFO 98881 --- [http-nio-8080-exec-3] c.m.m.service.PlacesCacheService         : Saved 30 spots to places_cache
+2026-08-13T11:08:43.764-04:00  INFO 98881 --- [http-nio-8080-exec-9] o.apache.coyote.http11.Http11Processor   : Error parsing HTTP request header
+ Note: further occurrences of HTTP request parsing errors will be logged at DEBUG level.
+
+java.lang.IllegalArgumentException: Invalid character found in method name [0x160x030x010x010x000x010x000x000xfc0x030x030x85ZlD0xfd0xe0Y0xfe0xa20xb10x890xfbs>Y0xea0x020xb40xf10xd10xad0x0400xd70xec0x18)0xc20x800xd00xf7! ]. HTTP method names must be tokens
+	at org.apache.coyote.http11.Http11InputBuffer.parseRequestLine(Http11InputBuffer.java:402) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:272) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:903) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1774) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.50.jar:10.1.50]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+
