@@ -47,6 +47,7 @@ public class SaveRouteRequestDto {
         private Integer reviewsTotal;
         private String openingHoursJson;
         private String utcOffsetMinutes;
+        private String googlePhoto;
         private Double distFromStart;
         private Boolean isRestZoneAddition;
         private Boolean isManuallyAdded;

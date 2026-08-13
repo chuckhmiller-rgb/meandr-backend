@@ -83,4 +83,8 @@ public class MeandrConstants {
             Map.entry("WAYSIDE_SHRINE", "wayside shrine roadside shrine")
             
     );
+    
+    public static final String FIELD_MASK_FIELDS = "places.id,places.displayName,places.formattedAddress,places.types,"
+                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions,places.photos";
+    
 }

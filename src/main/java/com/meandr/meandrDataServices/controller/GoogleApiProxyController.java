@@ -68,6 +68,8 @@ public class GoogleApiProxyController {
     private static final List<String> MOST_RELEVANT_TYPES = MeandrConstants.MOST_RELEVANT_TYPES;
     private static final Map<String, String> ENTITY_KEYWORDS = MeandrConstants.ENTITY_KEYWORDS;
 
+    private static final String FIELD_MASK_FIELDS = MeandrConstants.FIELD_MASK_FIELDS;
+
     @Autowired
     private PlacesCacheService placesCacheService;
 
@@ -309,7 +311,7 @@ public class GoogleApiProxyController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Api-Key", apiKey);
-        headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
+        headers.set("X-Goog-FieldMask", MeandrConstants.FIELD_MASK_FIELDS);
 
         List<String> includedTypes = List.of(
                 "restaurant", "cafe", "bar", "bakery", "brewery", "winery",
@@ -357,7 +359,7 @@ public class GoogleApiProxyController {
             HttpHeaders textHeaders = new HttpHeaders();
             textHeaders.setContentType(MediaType.APPLICATION_JSON);
             textHeaders.set("X-Goog-Api-Key", apiKey);
-            textHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
+            textHeaders.set("X-Goog-FieldMask", MeandrConstants.FIELD_MASK_FIELDS);
 
             Map<String, Object> textBody = new HashMap<>();
             textBody.put("textQuery", "EV charging station");
@@ -382,6 +384,26 @@ public class GoogleApiProxyController {
                     results.add(p);
                     seenIds.add(id);
                 }
+            }
+
+            List<ScenicSpot> toCache = results.stream().map(p -> {
+                ScenicSpot spot = new ScenicSpot();
+                spot.setPlaceId((String) p.get("placeId"));
+                spot.setName((String) p.get("name"));
+                spot.setAddress((String) p.get("address"));
+                spot.setLat((double) p.get("lat"));
+                spot.setLng((double) p.get("lng"));
+                spot.setRating(p.get("rating") != null ? (double) p.get("rating") : 0.0);
+                spot.setUserRatingsTotal(p.get("userRatingsTotal") != null ? (int) p.get("userRatingsTotal") : 0);
+                spot.setEntityType((String) p.get("entityType"));
+                spot.setOpeningHoursJson((String) p.get("openingHoursJson"));
+                spot.setUtcOffsetMinutes((Integer) p.get("utcOffsetMinutes"));
+                spot.setGooglePhoto((String) p.get("googlePhoto"));
+                return spot;
+            }).collect(Collectors.toList());
+
+            if (!toCache.isEmpty()) {
+                placesCacheService.saveAll(toCache);
             }
 
             return ResponseEntity.ok(results);
@@ -420,7 +442,7 @@ public class GoogleApiProxyController {
                 HttpHeaders nearbyHeaders = new HttpHeaders();
                 nearbyHeaders.setContentType(MediaType.APPLICATION_JSON);
                 nearbyHeaders.set("X-Goog-Api-Key", apiKey);
-                nearbyHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
+                nearbyHeaders.set("X-Goog-FieldMask", FIELD_MASK_FIELDS);
 
                 Map<String, Object> nearbyBody = new HashMap<>();
                 nearbyBody.put("includedTypes", prefTypes);
@@ -452,7 +474,7 @@ public class GoogleApiProxyController {
                 HttpHeaders textHeaders = new HttpHeaders();
                 textHeaders.setContentType(MediaType.APPLICATION_JSON);
                 textHeaders.set("X-Goog-Api-Key", apiKey);
-                textHeaders.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
+                textHeaders.set("X-Goog-FieldMask", FIELD_MASK_FIELDS.toString());
 
                 Map<String, Object> textBody = new HashMap<>();
                 textBody.put("textQuery", keyword);
@@ -488,6 +510,15 @@ public class GoogleApiProxyController {
         }
     }
 
+    @GetMapping("/googlePhoto")
+    public ResponseEntity<byte[]> googlePhoto(@RequestParam String name, @RequestParam(defaultValue = "400") int maxHeightPx) {
+        String url = "https://places.googleapis.com/v1/" + name + "/media?maxHeightPx=" + maxHeightPx + "&key=" + apiKey;
+        ResponseEntity<byte[]> response = restTemplate.getForEntity(url, byte[].class);
+        return ResponseEntity.ok()
+                .contentType(MediaType.valueOf(response.getHeaders().getContentType().toString()))
+                .body(response.getBody());
+    }
+
     private Map<String, Object> radiusToRectangle(double lat, double lng, int radiusMeters) {
         double latDelta = radiusMeters / 111320.0;
         double lngDelta = radiusMeters / (111320.0 * Math.cos(Math.toRadians(lat)));
@@ -497,33 +528,6 @@ public class GoogleApiProxyController {
         );
     }
 
-    /*private List<Map<String, Object>> doNearbySearch (double lat, double lng, int radius, List<String> types,
-            String rankPreference, int maxResults, HttpHeaders headers, ObjectMapper mapper, Set<String> seenIds) throws Exception {
-        Map<String, Object> body = new HashMap<>();
-        body.put("includedTypes", types);
-        body.put("maxResultCount", maxResults);
-        body.put("rankPreference", rankPreference);
-        body.put("locationRestriction", Map.of(
-                "circle", Map.of("center", Map.of("latitude", lat, "longitude", lng), "radius", (double) radius)
-        ));
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.exchange(placesSearchNearbyUrl, HttpMethod.POST, entity, String.class);
-        JsonNode root = mapper.readTree(response.getBody());
-
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (JsonNode place : root.path("places")) {
-            String id = place.path("id").asText();
-            if (!seenIds.contains(id)) {
-                Map<String, Object> p = mapPlace(place, true);
-                if (p != null) {
-                    results.add(p);
-                    seenIds.add(id);
-                }
-            }
-        }
-        return results;
-    }*/
     @GetMapping("/test-arch")
     public ResponseEntity<?> testArch() {
         String url = "https://places.googleapis.com/v1/places:searchNearby";
@@ -590,9 +594,7 @@ public class GoogleApiProxyController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Api-Key", apiKey);
-        headers.set("X-Goog-FieldMask",
-                "places.id,places.displayName,places.formattedAddress,places.types,"
-                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
+        headers.set("X-Goog-FieldMask", FIELD_MASK_FIELDS);
 
         try {
             JsonNode response = restTemplate.postForObject(placesSearchNearbyUrl,
@@ -668,6 +670,14 @@ public class GoogleApiProxyController {
             p.put("connectorDetails", List.of());
             p.put("connectorCount", 0);
 
+        }
+
+        JsonNode photos = place.path("photos");
+        log.info("Raw photos node for {}: {}", place.path("displayName").path("text").asText(), photos.toString());
+        if (photos.isArray() && photos.size() > 0) {
+            p.put("googlePhoto", photos.get(0).path("name").asText(null));
+        } else {
+            p.put("googlePhoto", null);
         }
 
         return p;
@@ -747,6 +757,11 @@ public class GoogleApiProxyController {
 
         if (node.has("utcOffsetMinutes")) {
             spot.setUtcOffsetMinutes(node.get("utcOffsetMinutes").asInt());
+        }
+
+        JsonNode photos = node.path("photos");
+        if (photos.isArray() && photos.size() > 0) {
+            spot.setGooglePhoto(photos.get(0).path("name").asText(null));
         }
 
         spot.setScore(0.0);

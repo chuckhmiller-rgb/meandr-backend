@@ -33,6 +33,7 @@ public class ScoredWaypoint {
     private String address;
     private String openingHoursJson;
     private Integer utcOffsetMinutes;
+    private String googlePhoto;
     
 
     // Display metadata
@@ -95,6 +96,7 @@ public class ScoredWaypoint {
         w.address = c.getAddress();
         w.openingHoursJson = c.getOpeningHoursJson();
         w.utcOffsetMinutes = c.getUtcOffsetMinutes();
+        w.googlePhoto = c.getGooglePhoto();
         w.entityType = c.getEntityType();
         //log.info("fromGoogle: {} entityType={} candidate.entityType={}", 
         //c.getName(), w.entityType, c.getEntityType());

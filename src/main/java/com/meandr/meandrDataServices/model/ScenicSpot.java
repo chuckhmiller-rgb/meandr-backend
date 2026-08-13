@@ -29,6 +29,7 @@ public class ScenicSpot {
     private String entityType;  // Google Places type string or OsmEntityType.name()
     private String openingHoursJson;
     private Integer utcOffsetMinutes;
+    public String googlePhoto;
     private int segmentIndex;
     
     /**
@@ -78,6 +79,7 @@ public class ScenicSpot {
         this.businessStatus = other.businessStatus;
         this.openingHoursJson = other.openingHoursJson;
         this.utcOffsetMinutes = other.utcOffsetMinutes;
+        this.googlePhoto = other.googlePhoto;
         this.segmentIndex = other.segmentIndex;
         this.selectionPhase = other.selectionPhase;
         this.selectionDebugCode = other.selectionDebugCode;

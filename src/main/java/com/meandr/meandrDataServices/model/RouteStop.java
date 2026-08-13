@@ -50,6 +50,9 @@ public class RouteStop {
 
     @Column(name = "utc_offset_minutes", columnDefinition = "TEXT")
     private String utcOffsetMinutes;
+    
+    @Column(name = "google_photo", columnDefinition = "TEXT")
+    private String googlePhoto;
 
     @Column(name = "dist_from_start")
     private Double distFromStart;
