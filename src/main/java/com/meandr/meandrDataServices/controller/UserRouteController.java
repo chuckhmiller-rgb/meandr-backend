@@ -85,6 +85,7 @@ public class UserRouteController {
                         stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
                         stop.setGooglePhoto(s.getGooglePhoto());
                         stop.setReviewsTotal(s.getReviewsTotal());
+                        stop.setScore(s.getScore());
                         stop.setRoute(route);
                         return stop;
                     })

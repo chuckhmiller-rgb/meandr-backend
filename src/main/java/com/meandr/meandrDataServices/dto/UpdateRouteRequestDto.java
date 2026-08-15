@@ -30,6 +30,7 @@ public class UpdateRouteRequestDto {
         private String googlePhoto;
         private Double distFromStart;
         private Boolean isRestZoneAddition;
+        private Double score;
         private Boolean isManuallyAdded;
     }
 }

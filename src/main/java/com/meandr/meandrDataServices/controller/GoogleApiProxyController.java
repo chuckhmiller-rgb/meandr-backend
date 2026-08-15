@@ -306,19 +306,32 @@ public class GoogleApiProxyController {
     public ResponseEntity<List<Map<String, Object>>> restStopNearby(
             @RequestParam double lat,
             @RequestParam double lng,
-            @RequestParam(defaultValue = "15000") int radius) {
+            @RequestParam(defaultValue = "15000") int radius,
+            @RequestParam(defaultValue = "all") String category) {
+
+        List<String> includedTypes = switch (category) {
+            case "food" ->
+                List.of("restaurant", "cafe", "bar", "bakery", "brewery", "winery",
+                "beer_garden", "farmers_market", "night_club", "meal_takeaway", "convenience_store");
+            case "fuel" ->
+                List.of("gas_station");
+            case "lodging" ->
+                List.of("lodging", "campground");
+            case "rv_park" ->
+                List.of("rv_park");
+            case "ev_charging" ->
+                List.of("electric_vehicle_charging_station", "rest_stop");
+            default ->
+                List.of("restaurant", "cafe", "bar", "bakery", "brewery", "winery",
+                "beer_garden", "farmers_market", "night_club", "meal_takeaway",
+                "gas_station", "lodging", "convenience_store", "rest_stop",
+                "electric_vehicle_charging_station", "campground", "rv_park");
+        };
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Api-Key", apiKey);
         headers.set("X-Goog-FieldMask", MeandrConstants.FIELD_MASK_FIELDS);
-
-        List<String> includedTypes = List.of(
-                "restaurant", "cafe", "bar", "bakery", "brewery", "winery",
-                "beer_garden", "farmers_market", "night_club", "meal_takeaway",
-                "gas_station", "lodging", "convenience_store", "rest_stop",
-                "electric_vehicle_charging_station", "campground", "rv_park"
-        );
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("includedTypes", includedTypes);
@@ -330,23 +343,14 @@ public class GoogleApiProxyController {
                         "radius", (double) radius
                 )
         ));
-
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
         try {
-            ResponseEntity<String> response = restTemplate.exchange(placesSearchNearbyUrl, HttpMethod.POST, entity, String.class
-            );
-
-            String responseBody = response.getBody();
-            log.debug("Raw Google Places response: {}", responseBody);
-
+            ResponseEntity<String> response = restTemplate.exchange(placesSearchNearbyUrl, HttpMethod.POST, entity, String.class);
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(response.getBody());
             JsonNode places = root.path("places");
-
             List<Map<String, Object>> results = new ArrayList<>();
             Set<String> seenIds = new HashSet<>();
-
             for (JsonNode place : places) {
                 Map<String, Object> p = mapPlace(place, false);
                 if (p != null) {
@@ -355,37 +359,36 @@ public class GoogleApiProxyController {
                 }
             }
 
-// Text search to catch EV stations missed by type search
-            HttpHeaders textHeaders = new HttpHeaders();
-            textHeaders.setContentType(MediaType.APPLICATION_JSON);
-            textHeaders.set("X-Goog-Api-Key", apiKey);
-            textHeaders.set("X-Goog-FieldMask", MeandrConstants.FIELD_MASK_FIELDS);
-
-            Map<String, Object> textBody = new HashMap<>();
-            textBody.put("textQuery", "EV charging station");
-            textBody.put("locationBias", Map.of(
-                    "circle", Map.of(
-                            "center", Map.of("latitude", lat, "longitude", lng),
-                            "radius", (double) radius
-                    )
-            ));
-            textBody.put("maxResultCount", 10);
-
-            HttpEntity<Map<String, Object>> textEntity = new HttpEntity<>(textBody, textHeaders);
-            ResponseEntity<String> textResponse = restTemplate.exchange(placesSearchTextUrl, HttpMethod.POST, textEntity, String.class
-            );
-
-            JsonNode textRoot = mapper.readTree(textResponse.getBody());
-            for (JsonNode place : textRoot.path("places")) {
-                String id = place.path("id").asText();
-                if (!seenIds.contains(id)) {
-                    Map<String, Object> p = mapPlace(place, false);
-                    p.put("entityType", "ev_charging");
-                    results.add(p);
-                    seenIds.add(id);
+            // EV text-search fallback — only relevant for ev_charging / all
+            if (category.equals("ev_charging") || category.equals("all")) {
+                HttpHeaders textHeaders = new HttpHeaders();
+                textHeaders.setContentType(MediaType.APPLICATION_JSON);
+                textHeaders.set("X-Goog-Api-Key", apiKey);
+                textHeaders.set("X-Goog-FieldMask", MeandrConstants.FIELD_MASK_FIELDS);
+                Map<String, Object> textBody = new HashMap<>();
+                textBody.put("textQuery", "EV charging station");
+                textBody.put("locationBias", Map.of(
+                        "circle", Map.of(
+                                "center", Map.of("latitude", lat, "longitude", lng),
+                                "radius", (double) radius
+                        )
+                ));
+                textBody.put("maxResultCount", 10);
+                HttpEntity<Map<String, Object>> textEntity = new HttpEntity<>(textBody, textHeaders);
+                ResponseEntity<String> textResponse = restTemplate.exchange(placesSearchTextUrl, HttpMethod.POST, textEntity, String.class);
+                JsonNode textRoot = mapper.readTree(textResponse.getBody());
+                for (JsonNode place : textRoot.path("places")) {
+                    String id = place.path("id").asText();
+                    if (!seenIds.contains(id)) {
+                        Map<String, Object> p = mapPlace(place, false);
+                        p.put("entityType", "ev_charging");
+                        results.add(p);
+                        seenIds.add(id);
+                    }
                 }
             }
 
+            // caching, same as before
             List<ScenicSpot> toCache = results.stream().map(p -> {
                 ScenicSpot spot = new ScenicSpot();
                 spot.setPlaceId((String) p.get("placeId"));
@@ -407,7 +410,6 @@ public class GoogleApiProxyController {
             }
 
             return ResponseEntity.ok(results);
-
         } catch (Exception e) {
             log.error("Error calling rest stop nearby search: {}", e.getMessage());
             return ResponseEntity.status(500).body(null);

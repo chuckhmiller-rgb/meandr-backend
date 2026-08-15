@@ -59,6 +59,9 @@ public class RouteStop {
 
     @Column(name = "is_rest_zone_addition")
     private Boolean isRestZoneAddition;
+    
+    @Column(name = "score")
+    private Double score;
 
     @Column(name = "is_manually_added")
     private Boolean isManuallyAdded;
