@@ -71,10 +71,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of(
+        config.setAllowedOriginPatterns(List.of(
                 "http://localhost:5173",
                 "https://meandr.app",
                 "https://meandr-app.vercel.app",
+                "https://meandr-*-chuckhmiller-1697s-projects.vercel.app",
                 "https://miss-proarmy-nonfraternally.ngrok-free.dev",
                 "http://localhost:3000",
                 "http://127.0.0.1:5173"

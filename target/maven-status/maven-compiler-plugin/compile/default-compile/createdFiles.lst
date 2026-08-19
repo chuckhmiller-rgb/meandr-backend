@@ -35,6 +35,7 @@ com/meandr/meandrDataServices/scoring/ScoredWaypoint.class
 com/meandr/meandrDataServices/scoring/WaypointScoringService.class
 com/meandr/meandrDataServices/repository/ParkRepository.class
 com/meandr/meandrDataServices/service/PlacesCacheService.class
+com/meandr/meandrDataServices/model/TripSummary.class
 com/meandr/meandrDataServices/exception/GlobalExceptionHandler.class
 com/meandr/meandrDataServices/scoring/GooglePlaceCandidate.class
 com/meandr/meandrDataServices/model/UserEntityPreference.class
@@ -50,7 +51,6 @@ com/meandr/meandrDataServices/service/RouteBeautifierService.class
 com/meandr/meandrDataServices/dto/UsersRegistrationDto$UsersRegistrationDtoBuilder.class
 com/meandr/meandrDataServices/util/GooglePlacesTypeMapper.class
 com/meandr/meandrDataServices/model/Park.class
-com/meandr/meandrDataServices/dto/TripSummary.class
 com/meandr/meandrDataServices/service/ScenicRankerService.class
 com/meandr/meandrDataServices/dto/UserRouteSummaryDto$UserRouteSummaryDtoBuilder.class
 com/meandr/meandrDataServices/controller/ParkController.class

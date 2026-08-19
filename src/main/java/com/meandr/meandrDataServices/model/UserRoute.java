@@ -95,6 +95,9 @@ public class UserRoute {
     
     @Column(name = "rest_stop_cadence", columnDefinition = "TEXT")
     private String restStopCadence;
+    
+    @Column(name = "budget_utilization")
+    private Double budgetUtilization;
 
     @Column(nullable = false)
     private boolean deleted = false;

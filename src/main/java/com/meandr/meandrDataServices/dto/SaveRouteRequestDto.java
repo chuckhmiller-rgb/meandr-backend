@@ -19,6 +19,7 @@ public class SaveRouteRequestDto {
     private String masterPolyline;
     private Integer baseTripMins;
     private Integer addedMins;
+    private Double budgetUtilization;
     private Integer mf;
     private Boolean avoidHighways;
     private Boolean avoidTolls;

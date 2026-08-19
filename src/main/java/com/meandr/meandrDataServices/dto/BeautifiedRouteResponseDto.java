@@ -1,5 +1,6 @@
 package com.meandr.meandrDataServices.dto;
 
+import com.meandr.meandrDataServices.model.TripSummary;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.meandr.meandrDataServices.model.ScenicSpot;
 import java.util.ArrayList;

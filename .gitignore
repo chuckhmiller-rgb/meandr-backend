@@ -2,3 +2,4 @@ logs/
 newhtml.html
 .vercel
 *.log
+target

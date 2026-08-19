@@ -47,6 +47,7 @@ public class UserRouteController {
                 .masterPolyline(request.getMasterPolyline())
                 .baseTripMins(request.getBaseTripMins())
                 .addedMins(request.getAddedMins())
+                .budgetUtilization(request.getBudgetUtilization())
                 .mf(request.getMf())
                 .avoidHighways(request.getAvoidHighways())
                 .avoidTolls(request.getAvoidTolls())
@@ -191,6 +192,15 @@ public class UserRouteController {
 
         if (body.getMasterPolyline() != null) {
             route.setMasterPolyline(body.getMasterPolyline());
+        }
+        if (body.getBaseTripMins() != null) {
+            route.setBaseTripMins(body.getBaseTripMins());
+        }
+        if (body.getAddedMins() != null) {
+            route.setAddedMins(body.getAddedMins());
+        }
+        if (body.getBudgetUtilization() != null) {
+            route.setBudgetUtilization(body.getBudgetUtilization());
         }
         if (body.getRejectedStops() != null) {
             route.setRejectedStops(new ObjectMapper().writeValueAsString(body.getRejectedStops()));

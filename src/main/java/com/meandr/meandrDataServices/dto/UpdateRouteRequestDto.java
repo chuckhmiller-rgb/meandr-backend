@@ -8,6 +8,9 @@ import java.util.Map;
 @NoArgsConstructor
 public class UpdateRouteRequestDto {
     private String masterPolyline;
+    private Integer baseTripMins;
+    private Integer addedMins;
+    private Double budgetUtilization;
     private List<StopDto> stops;
     private List<StopDto> rejectedStops;
     private List<Map<String, Double>> restStopZones;
