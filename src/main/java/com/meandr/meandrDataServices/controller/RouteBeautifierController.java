@@ -7,29 +7,64 @@ import com.meandr.meandrDataServices.model.ScenicSpot;
 import com.meandr.meandrDataServices.osm.model.OsmSearchRequest.LatLng;
 import com.meandr.meandrDataServices.service.RouteBeautifierService;
 import com.meandr.meandrDataServices.service.RouteBeautifierService.RoutingResultWithWaypoints;
+import com.meandr.meandrDataServices.service.MapBoxRoutingService;
+import com.meandr.meandrDataServices.service.MapBoxRoutingService.MapBoxRoute;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.HashMap;
 import java.util.List;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 
-@CrossOrigin(origins = "https://meandr-app.vercel.app")
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/route")
 @RequiredArgsConstructor
 public class RouteBeautifierController {
 
-    public final RouteBeautifierService beautifierService;
+    private final RouteBeautifierService routeBeautifierService;
+    private final MapBoxRoutingService mapBoxRoutingService;
+
+    
+
+    @GetMapping("/segment-estimate")
+    public ResponseEntity<Map<String, Object>> getSegmentEstimate(
+            @RequestParam double originLat,
+            @RequestParam double originLng,
+            @RequestParam double destLat,
+            @RequestParam double destLng) {
+
+        List<MapBoxRoute> routes = mapBoxRoutingService.getRouteAlternatives(originLat, originLng, destLat, destLng);
+
+        if (routes.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("message", "Could not calculate segment estimate"));
+        }
+
+        MapBoxRoute fastest = routes.get(0);
+        double durationMins = fastest.getDuration() / 60.0;
+        double distanceMiles = fastest.getDistance() / 1609.34;
+
+        return ResponseEntity.ok(Map.of(
+                "durationMins", Math.round(durationMins),
+                "distanceMiles", Math.round(distanceMiles * 10.0) / 10.0
+        ));
+    }
 
     @Operation(summary = "Beautify route from origin and destination")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -84,7 +119,7 @@ public class RouteBeautifierController {
                 request.getExcludeKeywords(),
                 request.getRestStopCadence());
 
-        BeautifiedRouteResponseDto response = beautifierService.beautifyRouteWithScenicRoads(
+        BeautifiedRouteResponseDto response = routeBeautifierService.beautifyRouteWithScenicRoads(
                 request.getOrigin(),
                 request.getDestination(),
                 request.getRouteEnhancementThreshold(),
@@ -122,7 +157,7 @@ public class RouteBeautifierController {
     @PostMapping("/reroute")
     public ResponseEntity<?> reroute(@RequestBody RerouteRequestDto request) {
         try {
-            Map<String, Object> result = beautifierService.routeWithWaypoints(
+            Map<String, Object> result = routeBeautifierService.routeWithWaypoints(
                     request.getOrigin(),
                     request.getDestination(),
                     request.getWaypoints().stream().map(w -> {

@@ -3,6 +3,7 @@ package com.meandr.meandrDataServices.controller;
 import com.meandr.meandrDataServices.model.Users;
 import com.meandr.meandrDataServices.security.JwtUtil;
 import com.meandr.meandrDataServices.service.UsersService;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,5 +68,17 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Invalid credentials"));
         }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
+        String refreshToken = body.get("refreshToken");
+        if (refreshToken == null || !jwtUtil.isValidRefreshToken(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Invalid or expired refresh token"));
+        }
+        String username = jwtUtil.extractUsername(refreshToken);
+        String newAccessToken = jwtUtil.generateToken(username);
+        return ResponseEntity.ok(Map.of("token", newAccessToken));
     }
 }

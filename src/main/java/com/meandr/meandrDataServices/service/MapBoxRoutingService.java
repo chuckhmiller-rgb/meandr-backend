@@ -3,6 +3,7 @@ package com.meandr.meandrDataServices.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meandr.meandrDataServices.dto.CoordinateDto;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -11,22 +12,29 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
 @Service
 public class MapBoxRoutingService {
 
-    private final String accessToken;
+    
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-
+    
+   @Value("${mapbox.api.key}")
+    private String accessToken;
+    
     public MapBoxRoutingService() {
-        this.accessToken = System.getenv("MAPBOX_API_KEY");
-        if (accessToken == null || accessToken.isEmpty()) {
-            log.warn("MAPBOX_ACCESS_TOKEN not set - scenic routing will be disabled");
-        }
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
+    }
+    
+    @PostConstruct
+    public void checkToken() {
+        if (accessToken == null || accessToken.isEmpty()) {
+            log.warn("MAPBOX_API_KEY not set - scenic routing will be disabled");
+        }
     }
 
     /**

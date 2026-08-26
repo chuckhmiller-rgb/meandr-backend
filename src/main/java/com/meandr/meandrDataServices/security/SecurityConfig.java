@@ -33,6 +33,7 @@ public class SecurityConfig {
                 .requestMatchers(
                         "/api/v1/users/register",
                         "/api/v1/auth/login",
+                        "/api/v1/auth/refresh",
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/reset-password",
                         "/api/v1/route/**",
@@ -78,7 +79,8 @@ public class SecurityConfig {
                 "https://meandr-*-chuckhmiller-1697s-projects.vercel.app",
                 "https://miss-proarmy-nonfraternally.ngrok-free.dev",
                 "http://localhost:3000",
-                "http://127.0.0.1:5173"
+                "http://127.0.0.1:5173",
+                "http://192.168.1.250:5173"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
