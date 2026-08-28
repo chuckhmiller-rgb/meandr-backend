@@ -45,7 +45,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class WaypointPhotoController {
 
     private final WaypointPhotoRepository waypointPhotoRepository;
-    private LocalDateTime takenAt;
+    //private LocalDateTime takenAt;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        log.info("WaypointPhotoController loaded and ready");
+    }
 
     @PostMapping
     public ResponseEntity<?> savePhoto(@RequestBody WaypointPhotoDto dto,
@@ -109,8 +114,8 @@ public class WaypointPhotoController {
     }
 
     @DeleteMapping("/place/{placeId}")
-    public ResponseEntity<?> deleteAllForPlace(@PathVariable String placeId) {
-        List<WaypointPhoto> photos = waypointPhotoRepository.findByPlaceId(placeId);
+    public ResponseEntity<?> deleteAllForPlace(@PathVariable String placeId, @RequestParam Long userId) {
+        List<WaypointPhoto> photos = waypointPhotoRepository.findByPlaceIdAndUserId(placeId, userId);
         waypointPhotoRepository.deleteAll(photos);
         return ResponseEntity.ok(Map.of("success", true, "deleted", photos.size()));
     }

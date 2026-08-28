@@ -73,6 +73,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOriginPatterns(List.of(
+                "https://api.meandr.app",
                 "http://localhost:5173",
                 "https://meandr.app",
                 "https://meandr-app.vercel.app",

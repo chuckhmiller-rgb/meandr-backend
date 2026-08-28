@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.EmptyResultDataAccessException;
 
 @Slf4j
 @Service
@@ -145,5 +146,23 @@ public class PlacesCacheService {
             params[4 + i] = entityTypes.get(i);
         }
         return params;
+    }
+
+    public byte[] findPhotoBytes(String placeId, int maxHeightPx) {
+        String sql = String.format("""
+        SELECT photo_bytes FROM places_cache
+        WHERE place_id = ? AND photo_bytes_height_px = ?
+          AND cached_at > NOW() - INTERVAL %d DAY
+        """, CACHE_TTL_DAYS);
+        try {
+            return jdbcTemplate.queryForObject(sql, byte[].class, placeId, maxHeightPx);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    public void savePhotoBytes(String placeId, int maxHeightPx, byte[] photoBytes) {
+        String sql = "UPDATE places_cache SET photo_bytes = ?, photo_bytes_height_px = ? WHERE place_id = ?";
+        jdbcTemplate.update(sql, photoBytes, maxHeightPx, placeId);
     }
 }

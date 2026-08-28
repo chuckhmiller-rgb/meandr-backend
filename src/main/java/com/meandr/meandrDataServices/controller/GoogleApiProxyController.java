@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
+import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -514,11 +516,37 @@ public class GoogleApiProxyController {
 
     @GetMapping("/googlePhoto")
     public ResponseEntity<byte[]> googlePhoto(@RequestParam String name, @RequestParam(defaultValue = "400") int maxHeightPx) {
+        String placeId = extractPlaceId(name);
+
+        if (placeId != null) {
+            byte[] cached = placesCacheService.findPhotoBytes(placeId, maxHeightPx);
+            if (cached != null) {
+                log.info("Photo cache hit for placeId={}", placeId);
+                return ResponseEntity.ok()
+                        .contentType(MediaType.IMAGE_JPEG)
+                        .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS))
+                        .body(cached);
+            }
+        }
+
         String url = "https://places.googleapis.com/v1/" + name + "/media?maxHeightPx=" + maxHeightPx + "&key=" + apiKey;
         ResponseEntity<byte[]> response = restTemplate.getForEntity(url, byte[].class);
+        byte[] imageBytes = response.getBody();
+
+        if (placeId != null && imageBytes != null) {
+            placesCacheService.savePhotoBytes(placeId, maxHeightPx, imageBytes);
+        }
+
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf(response.getHeaders().getContentType().toString()))
-                .body(response.getBody());
+                .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS))
+                .body(imageBytes);
+    }
+
+    private String extractPlaceId(String photoName) {
+        // photoName looks like: places/PLACE_ID/photos/PHOTO_ID
+        String[] parts = photoName.split("/");
+        return parts.length >= 2 ? parts[1] : null;
     }
 
     private Map<String, Object> radiusToRectangle(double lat, double lng, int radiusMeters) {
