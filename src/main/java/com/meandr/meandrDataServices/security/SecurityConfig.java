@@ -37,6 +37,7 @@ public class SecurityConfig {
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/reset-password",
                         "/api/v1/route/**",
+                        "/api/v1/route-ratings/**",
                         "/api/v1/waypoint-photos/**",
                         "/api/v1/places/**",
                         "/api/v1/maps/**",

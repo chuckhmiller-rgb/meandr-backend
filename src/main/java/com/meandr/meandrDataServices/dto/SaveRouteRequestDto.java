@@ -8,6 +8,7 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 public class SaveRouteRequestDto {
+
     private String userName;
     private String routeName;
     private String originName;
@@ -32,11 +33,11 @@ public class SaveRouteRequestDto {
     private List<StopDto> rejectedStops;
     private List<Map<String, Double>> restStopZones;
     private String restStopCadence;
-    
 
     @Data
     @NoArgsConstructor
     public static class StopDto {
+
         private String placeId;
         private String placeName;
         private String placeAddress;
@@ -49,10 +50,12 @@ public class SaveRouteRequestDto {
         private String openingHoursJson;
         private String utcOffsetMinutes;
         private String googlePhoto;
+        private String nationalPhoneNumber;
+        private String internationalPhoneNumber;
         private Double distFromStart;
         private Boolean isRestZoneAddition;
         private Double score;
         private Boolean isManuallyAdded;
-        
+
     }
 }

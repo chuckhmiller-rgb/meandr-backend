@@ -85,6 +85,8 @@ public class UserRouteController {
                         stop.setOpeningHoursJson(s.getOpeningHoursJson());
                         stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
                         stop.setGooglePhoto(s.getGooglePhoto());
+                        stop.setNationalPhoneNumber(s.getNationalPhoneNumber());
+                        stop.setInternationalPhoneNumber(s.getInternationalPhoneNumber());
                         stop.setReviewsTotal(s.getReviewsTotal());
                         stop.setScore(s.getScore());
                         stop.setRoute(route);
@@ -235,6 +237,9 @@ public class UserRouteController {
                         stop.setOpeningHoursJson(s.getOpeningHoursJson());
                         stop.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
                         stop.setGooglePhoto(s.getGooglePhoto());
+                        stop.setNationalPhoneNumber(s.getNationalPhoneNumber());
+                        stop.setInternationalPhoneNumber(s.getInternationalPhoneNumber());
+                        
                         return stop;
                     }).toList();
             route.getStops().addAll(newStops);

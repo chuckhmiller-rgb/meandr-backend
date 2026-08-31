@@ -30,8 +30,10 @@ public class ScenicSpot {
     private String openingHoursJson;
     private Integer utcOffsetMinutes;
     public String googlePhoto;
+    public String nationalPhoneNumber;
+    public String internationalPhoneNumber;
     private int segmentIndex;
-    
+
     /**
      * Tracks how and when this place was found and selected during route
      * beautification.
@@ -80,6 +82,8 @@ public class ScenicSpot {
         this.openingHoursJson = other.openingHoursJson;
         this.utcOffsetMinutes = other.utcOffsetMinutes;
         this.googlePhoto = other.googlePhoto;
+        this.nationalPhoneNumber = other.nationalPhoneNumber;
+        this.internationalPhoneNumber = other.internationalPhoneNumber;
         this.segmentIndex = other.segmentIndex;
         this.selectionPhase = other.selectionPhase;
         this.selectionDebugCode = other.selectionDebugCode;

@@ -1268,6 +1268,8 @@ public class RouteBeautifierService {
             c.setOpeningHoursJson(s.getOpeningHoursJson());
             c.setUtcOffsetMinutes(s.getUtcOffsetMinutes());
             c.setGooglePhoto(s.getGooglePhoto());
+            c.setNationalPhoneNumber(s.getNationalPhoneNumber());
+            c.setInternationalPhoneNumber(s.getInternationalPhoneNumber());
             c.setSelectionDebugCode(s.getSearchSource());
             c.setSearchSource(s.getSearchSource());
             return c;
@@ -1310,6 +1312,8 @@ public class RouteBeautifierService {
                 spot.setOpeningHoursJson(sw.getOpeningHoursJson());
                 spot.setUtcOffsetMinutes(sw.getUtcOffsetMinutes());
                 spot.setGooglePhoto(sw.getGooglePhoto());
+                spot.setNationalPhoneNumber(sw.getNationalPhoneNumber());
+                spot.setInternationalPhoneNumber(sw.getInternationalPhoneNumber());
                 spot.setRating(sw.getRating() != null ? sw.getRating() : 0.0);
                 spot.setUserRatingsTotal(sw.getUserRatingCount() != null ? sw.getUserRatingCount() : 0);
                 spot.setScore(sw.getScore());

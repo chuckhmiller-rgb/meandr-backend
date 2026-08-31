@@ -35,6 +35,8 @@ public class PlacesCacheService {
         int utcOffset = rs.getInt("utc_offset_minutes");
         spot.setUtcOffsetMinutes(rs.wasNull() ? null : utcOffset);
         spot.setGooglePhoto(rs.getString("google_photo"));
+        spot.setNationalPhoneNumber(rs.getString("national_phone_number"));
+        spot.setInternationalPhoneNumber(rs.getString("international_phone_number"));
         return spot;
     };
 
@@ -56,7 +58,7 @@ public class PlacesCacheService {
             // Skip entity type filter — return all cached spots in radius
             String sql = String.format("""
             SELECT place_id, name, lat, lng, rating, user_ratings_total,
-                   entity_type, address, opening_hours_json, utc_offset_minutes, google_photo
+                   entity_type, address, opening_hours_json, utc_offset_minutes, google_photo, national_phone_number, international_phone_number
             FROM places_cache
             WHERE lat BETWEEN ? AND ?
               AND lng BETWEEN ? AND ?
@@ -73,7 +75,7 @@ public class PlacesCacheService {
 
         String sql = String.format("""
                 SELECT place_id, name, lat, lng, rating, user_ratings_total,
-                       entity_type, address, opening_hours_json, utc_offset_minutes, google_photo
+                       entity_type, address, opening_hours_json, utc_offset_minutes, google_photo, national_phone_number, international_phone_number
                 FROM places_cache
                 WHERE lat BETWEEN ? AND ?
                   AND lng BETWEEN ? AND ?
@@ -91,14 +93,16 @@ public class PlacesCacheService {
         String sql = """
                 INSERT INTO places_cache
                     (place_id, name, lat, lng, rating, user_ratings_total,
-                     entity_type, address, opening_hours_json, utc_offset_minutes, google_photo, cached_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                     entity_type, address, opening_hours_json, utc_offset_minutes, google_photo, national_phone_number, international_phone_number, cached_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
                         rating              = VALUES(rating),
                         user_ratings_total  = VALUES(user_ratings_total),
                         opening_hours_json  = VALUES(opening_hours_json),
                         utc_offset_minutes  = VALUES(utc_offset_minutes),
                         google_photo        = VALUES(google_photo),
+                        national_phone_number        = VALUES(national_phone_number),
+                        international_phone_number   = VALUES(international_phone_number),
                         cached_at           = NOW()
                 """;
 
@@ -118,7 +122,9 @@ public class PlacesCacheService {
                     spot.getAddress(),
                     spot.getOpeningHoursJson(),
                     spot.getUtcOffsetMinutes(),
-                    spot.getGooglePhoto()
+                    spot.getGooglePhoto(),
+                    spot.getNationalPhoneNumber(),
+                    spot.getInternationalPhoneNumber()
             );
             saved++;
         }

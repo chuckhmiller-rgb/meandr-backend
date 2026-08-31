@@ -69,6 +69,7 @@ com/meandr/meandrDataServices/controller/GoogleApiProxyController.class
 com/meandr/meandrDataServices/service/EntityPreferenceService$PreferenceEntry.class
 com/meandr/meandrDataServices/controller/PasswordResetController.class
 com/meandr/meandrDataServices/model/ClimbingGym$ClimbingGymBuilder.class
+com/meandr/meandrDataServices/model/RouteRating$RouteRatingBuilder.class
 com/meandr/meandrDataServices/service/ParkService.class
 com/meandr/meandrDataServices/config/DebugConfig.class
 com/meandr/meandrDataServices/mapper/UsersFieldUpdateMapperImpl.class
@@ -91,6 +92,7 @@ com/meandr/meandrDataServices/dto/WaypointPhotoDto.class
 com/meandr/meandrDataServices/dto/RouteStepDetailDto.class
 com/meandr/meandrDataServices/ServletInitializer.class
 com/meandr/meandrDataServices/preferences/EntityCategory.class
+com/meandr/meandrDataServices/model/RouteRating.class
 com/meandr/meandrDataServices/model/Park$ParkBuilder.class
 com/meandr/meandrDataServices/service/MapBoxRoutingService$MapBoxRoute.class
 com/meandr/meandrDataServices/controller/VisualizerController.class
@@ -99,9 +101,11 @@ com/meandr/meandrDataServices/preferences/EntitySource.class
 com/meandr/meandrDataServices/scoring/ScoredWaypoint$Source.class
 com/meandr/meandrDataServices/dto/UserRouteDto.class
 com/meandr/meandrDataServices/security/SecurityConfig.class
+com/meandr/meandrDataServices/controller/RouteRatingController.class
 com/meandr/meandrDataServices/service/ClimbingGymService.class
 com/meandr/meandrDataServices/config/CacheConfig.class
 com/meandr/meandrDataServices/controller/RouteBeautifierController.class
+com/meandr/meandrDataServices/repository/RouteRatingRepository.class
 com/meandr/meandrDataServices/model/UserRoute.class
 com/meandr/meandrDataServices/model/Users.class
 com/meandr/meandrDataServices/service/EntityPreferenceService$TypePreferenceView.class

@@ -53,6 +53,12 @@ public class RouteStop {
     
     @Column(name = "google_photo", columnDefinition = "TEXT")
     private String googlePhoto;
+    
+    @Column(name = "national_phone_number", columnDefinition = "TEXT")
+    private String nationalPhoneNumber;
+    
+    @Column(name = "international_phone_number", columnDefinition = "TEXT")
+    private String internationalPhoneNumber;
 
     @Column(name = "dist_from_start")
     private Double distFromStart;

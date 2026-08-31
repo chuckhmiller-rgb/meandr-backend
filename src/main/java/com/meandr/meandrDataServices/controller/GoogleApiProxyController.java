@@ -206,10 +206,8 @@ public class GoogleApiProxyController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Api-Key", apiKey);
-        headers.set("X-Goog-FieldMask",
-                "places.id,places.displayName,places.formattedAddress,places.types,"
-                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions");
-
+        headers.set("X-Goog-FieldMask", FIELD_MASK_FIELDS);
+                
         try {
             JsonNode response = restTemplate.postForObject(
                     "https://places.googleapis.com/v1/places:searchText",
@@ -280,7 +278,7 @@ public class GoogleApiProxyController {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Api-Key", apiKey);
         // The FieldMask is REQUIRED. This defines what data you get back.
-        headers.set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.types,places.location,places.rating,places.userRatingCount,places.utcOffsetMinutes,places.evChargeOptions");
+        headers.set("X-Goog-FieldMask", FIELD_MASK_FIELDS);
 
         requestBody.put("rankPreference", "POPULARITY");
 
@@ -404,6 +402,9 @@ public class GoogleApiProxyController {
                 spot.setOpeningHoursJson((String) p.get("openingHoursJson"));
                 spot.setUtcOffsetMinutes((Integer) p.get("utcOffsetMinutes"));
                 spot.setGooglePhoto((String) p.get("googlePhoto"));
+                spot.setNationalPhoneNumber((String) p.get("nationalPhoneNumber"));
+                spot.setInternationalPhoneNumber((String) p.get("internationalPhoneNumber"));
+
                 return spot;
             }).collect(Collectors.toList());
 
@@ -675,6 +676,8 @@ public class GoogleApiProxyController {
         p.put("openingHoursJson", spot.getOpeningHoursJson());
         p.put("entityType", spot.getEntityType());
         p.put("utcOffsetMinutes", spot.getUtcOffsetMinutes());
+        p.put("nationalPhoneNumber", spot.getNationalPhoneNumber());
+        p.put("internationalPhoneNumber", spot.getInternationalPhoneNumber());
 
         JsonNode evCharge = place.path("evChargeOptions");
         if (!evCharge.isMissingNode()) {
@@ -754,6 +757,8 @@ public class GoogleApiProxyController {
         int userRatingsTotal = node.path("userRatingCount").asInt(0);
         double lat = node.path("location").path("latitude").asDouble();
         double lng = node.path("location").path("longitude").asDouble();
+        String nationalPhoneNumber = node.path("nationalPhoneNumber").asText();
+        String internationalPhoneNumber = node.path("internationalPhoneNumber").asText();
 
         ScenicSpot spot = new ScenicSpot();
         spot.setName(name);
@@ -763,6 +768,8 @@ public class GoogleApiProxyController {
         spot.setBusinessStatus(businessStatus);
         spot.setRating(rating);
         spot.setUserRatingsTotal(userRatingsTotal);
+        spot.setNationalPhoneNumber(nationalPhoneNumber);
+        spot.setInternationalPhoneNumber(internationalPhoneNumber);
         spot.setLat(lat);
         spot.setLng(lng);
 

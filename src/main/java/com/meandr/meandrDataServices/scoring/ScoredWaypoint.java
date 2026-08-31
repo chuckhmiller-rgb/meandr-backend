@@ -34,6 +34,9 @@ public class ScoredWaypoint {
     private String openingHoursJson;
     private Integer utcOffsetMinutes;
     private String googlePhoto;
+    private String nationalPhoneNumber;
+    private String internationalPhoneNumber;
+                        
     
 
     // Display metadata
@@ -97,6 +100,9 @@ public class ScoredWaypoint {
         w.openingHoursJson = c.getOpeningHoursJson();
         w.utcOffsetMinutes = c.getUtcOffsetMinutes();
         w.googlePhoto = c.getGooglePhoto();
+        w.nationalPhoneNumber = c.getNationalPhoneNumber();
+        w.internationalPhoneNumber = c.getInternationalPhoneNumber();
+        
         w.entityType = c.getEntityType();
         //log.info("fromGoogle: {} entityType={} candidate.entityType={}", 
         //c.getName(), w.entityType, c.getEntityType());

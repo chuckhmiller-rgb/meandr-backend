@@ -85,6 +85,7 @@ public class MeandrConstants {
     );
     
     public static final String FIELD_MASK_FIELDS = "places.id,places.displayName,places.formattedAddress,places.types,"
-                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,places.utcOffsetMinutes,places.evChargeOptions,places.photos";
+                + "places.location,places.rating,places.userRatingCount,places.regularOpeningHours,"
+            + "places.utcOffsetMinutes,places.evChargeOptions,places.photos,places.nationalPhoneNumber,places.internationalPhoneNumber";
     
 }

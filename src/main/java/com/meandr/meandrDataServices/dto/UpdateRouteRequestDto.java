@@ -31,6 +31,8 @@ public class UpdateRouteRequestDto {
         private String openingHoursJson;
         private String utcOffsetMinutes;
         private String googlePhoto;
+        private String nationalPhoneNumber;
+        private String internationalPhoneNumber;
         private Double distFromStart;
         private Boolean isRestZoneAddition;
         private Double score;

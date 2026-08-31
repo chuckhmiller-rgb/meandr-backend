@@ -25,6 +25,9 @@ public class GooglePlaceCandidate {
     private String openingHoursJson;
     private Integer utcOffsetMinutes;
     private String googlePhoto;
+    private String nationalPhoneNumber;
+    private String internationalPhoneNumber;
+        
     
     /**
      * Tracks how and when this place was found and selected during route
