@@ -706,7 +706,7 @@ public class GoogleApiProxyController {
         }
 
         JsonNode photos = place.path("photos");
-        log.info("Raw photos node for {}: {}", place.path("displayName").path("text").asText(), photos.toString());
+        log.debug("Raw photos node for {}: {}", place.path("displayName").path("text").asText(), photos.toString());
         if (photos.isArray() && photos.size() > 0) {
             p.put("googlePhoto", photos.get(0).path("name").asText(null));
         } else {

@@ -29,6 +29,7 @@ import com.meandr.meandrDataServices.osm.model.OsmSearchRequest;
 import com.meandr.meandrDataServices.osm.model.OsmEntityType;
 import com.meandr.meandrDataServices.osm.model.OsmPlace;
 import com.meandr.meandrDataServices.scoring.WaypointScoringService;
+import com.meandr.meandrDataServices.service.RouteBeautifierService.LatLng;
 import com.meandr.meandrDataServices.scoring.ScoredWaypoint;
 import com.meandr.meandrDataServices.scoring.GooglePlaceCandidate;
 import com.meandr.meandrDataServices.util.GooglePlacesTypeMapper;
@@ -87,8 +88,7 @@ public class RouteBeautifierService {
             // Tourist attractions — medium bar
             Map.entry("tourist_attraction", 35),
             Map.entry("dog_park", 10),
-            Map.entry("botanical_garden", 25)
-    );
+            Map.entry("botanical_garden", 25));
 
     LatLng originPoint;
     LatLng destinationPoint;
@@ -114,8 +114,7 @@ public class RouteBeautifierService {
      * Decode Google polyline into list of coordinates.
      */
     private List<CoordinateDto> decodePolylineToCoordinates(String encodedPolyline) {
-        List<com.google.maps.model.LatLng> decoded
-                = com.google.maps.internal.PolylineEncoding.decode(encodedPolyline);
+        List<com.google.maps.model.LatLng> decoded = com.google.maps.internal.PolylineEncoding.decode(encodedPolyline);
 
         return decoded.stream()
                 .map(point -> new CoordinateDto(point.lat, point.lng))
@@ -136,11 +135,12 @@ public class RouteBeautifierService {
             int dwellTimePerStop,
             List<List<Double>> selectedRouteCoords,
             List<String> includeKeywords,
-            List<String> excludeKeywords
-    ) throws Exception {
+            List<String> excludeKeywords) throws Exception {
 
-        log.info("Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, includeKeywords={}, excludeKeywords={}, entityPreferences={}, hasSelectedCoords={}",
-                routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest, includeKeywords, excludeKeywords, entityPreferences,
+        log.info(
+                "Beautifying route: enhancementThreshold={}, avoidHighways={}, avoidTolls={}, excludeOrigin={}, excludeDest={}, includeKeywords={}, excludeKeywords={}, entityPreferences={}, hasSelectedCoords={}",
+                routeEnhancementThreshold, avoidHighways, avoidTolls, excludeOrigin, excludeDest, includeKeywords,
+                excludeKeywords, entityPreferences,
                 selectedRouteCoords != null && !selectedRouteCoords.isEmpty());
 
         if (selectedRouteCoords != null && !selectedRouteCoords.isEmpty()) {
@@ -163,11 +163,13 @@ public class RouteBeautifierService {
                     .collect(Collectors.toList());
             baselineDurationMins = estimateDuration(routeCoords);
             encodedPolyline = encodePolyline(routeCoords);
-            log.info("Using pre-selected route: {} coords, estimated {} mins", routeCoords.size(), baselineDurationMins);
+            log.info("Using pre-selected route: {} coords, estimated {} mins", routeCoords.size(),
+                    baselineDurationMins);
 
         } else {
             // Fetch routes from Directions API
-            com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
+            com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(),
+                    origin.getLng());
             com.google.maps.model.LatLng googleDest = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
 
             // Always fetch fastest route for reference
@@ -222,7 +224,8 @@ public class RouteBeautifierService {
             }
 
             baselineDurationMins = baseResult.routes[0].legs[0].duration.inSeconds / 60;
-            log.info("Base route with restrictions duration: {} mins (fastest was {} mins)", baselineDurationMins, fastestRouteMins);
+            log.info("Base route with restrictions duration: {} mins (fastest was {} mins)", baselineDurationMins,
+                    fastestRouteMins);
 
             double enhancementPct = (routeEnhancementThreshold / baselineDurationMins) * 100.0;
             double maxAcceptableMins = baselineDurationMins * (1 + enhancementPct / 100.0);
@@ -231,7 +234,7 @@ public class RouteBeautifierService {
                     .filter(r -> (r.legs[0].duration.inSeconds / 60.0) <= maxAcceptableMins)
                     .findFirst()
                     .orElseThrow(() -> new RuntimeException(String.format(
-                    "No routes available within your enhancement budget of %.0f mins.", maxAcceptableMins)));
+                            "No routes available within your enhancement budget of %.0f mins.", maxAcceptableMins)));
 
             long totalSeconds = Arrays.stream(selectedRoute.legs)
                     .mapToLong(l -> l.duration.inSeconds)
@@ -248,7 +251,8 @@ public class RouteBeautifierService {
         log.info("Decoded route into {} coordinate points", routeCoords.size());
 
         return beautifyRoute(routeCoords, baselineDurationMins, enhancementPct,
-                radius, entityPreferences, excludeOrigin, excludeDest, restStopCadence, dwellTimePerStop, encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords);
+                radius, entityPreferences, excludeOrigin, excludeDest, restStopCadence, dwellTimePerStop,
+                encodedPolyline, avoidHighways, avoidTolls, includeKeywords, excludeKeywords);
     }
 
     public Map<String, Object> routeWithWaypoints(
@@ -258,10 +262,8 @@ public class RouteBeautifierService {
             boolean avoidHighways,
             boolean avoidTolls) throws Exception {
 
-        com.google.maps.model.LatLng googleOrigin
-                = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
-        com.google.maps.model.LatLng googleDest
-                = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
+        com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.getLat(), origin.getLng());
+        com.google.maps.model.LatLng googleDest = new com.google.maps.model.LatLng(dest.getLat(), dest.getLng());
 
         List<ScenicSpot> mutableWaypoints = new ArrayList<>(waypoints);
 
@@ -284,8 +286,8 @@ public class RouteBeautifierService {
 
             String[] waypointStrings = mutableWaypoints.stream()
                     .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
-                    ? "place_id:" + s.getPlaceId()
-                    : s.getLat() + "," + s.getLng())
+                            ? "place_id:" + s.getPlaceId()
+                            : s.getLat() + "," + s.getLng())
                     .toArray(String[]::new);
             request.waypoints(waypointStrings);
 
@@ -298,8 +300,7 @@ public class RouteBeautifierService {
                             .sum();
                     return Map.of(
                             "encodedPolyline", polyline,
-                            "durationMins", totalSeconds / 60.0
-                    );
+                            "durationMins", totalSeconds / 60.0);
                 }
             } catch (com.google.maps.errors.ZeroResultsException e) {
                 ScenicSpot removed = mutableWaypoints.stream()
@@ -372,9 +373,8 @@ public class RouteBeautifierService {
             boolean avoidHighways,
             boolean avoidTolls,
             List<String> includeKeywords,
-            List<String> excludeKeywords
-    ) {
-        
+            List<String> excludeKeywords) {
+
         long beautifyStart = System.currentTimeMillis();
         List<LatLng> path = routeCoords.stream()
                 .map(coord -> new LatLng(coord.getLat(), coord.getLng()))
@@ -387,7 +387,8 @@ public class RouteBeautifierService {
         // Increase sample density — aim for one search every ~25km
         int samplingStep = Math.max(1, (int) (path.size() / (totalPathLength / 25.0)));
         log.info("Sampling: {} points, step={}, ~{} km between samples",
-                path.size(), samplingStep, String.format("%.1f", totalPathLength / (path.size() / (double) samplingStep)));
+                path.size(), samplingStep,
+                String.format("%.1f", totalPathLength / (path.size() / (double) samplingStep)));
         int dynamicRadius = Math.min(10000, (int) (radius * (1 + (routeEnhancementThreshold / 1000.0))));
 
         List<ScenicSpot> candidates = findScenicSpotsAlongPath(
@@ -399,8 +400,7 @@ public class RouteBeautifierService {
                 destinationPoint,
                 (int) routeEnhancementThreshold,
                 includeKeywords,
-                excludeKeywords
-        );
+                excludeKeywords);
 
         List<ScenicSpot> topCandidates = getEscalatedSelection(
                 candidates,
@@ -413,15 +413,15 @@ public class RouteBeautifierService {
                 entityPreferences,
                 routeCoords,
                 includeKeywords,
-                excludeKeywords
-        );
+                excludeKeywords);
 
         log.info("Selected {} waypoints from {} candidates", topCandidates.size(), candidates.size());
 
         // Attempt routing with self-healing, fall back to polyline-only on failure
         RoutingResultWithWaypoints routing;
         try {
-            routing = fetchBeautifiedPathDetails(originPoint, destinationPoint, topCandidates, avoidHighways, avoidTolls);
+            routing = fetchBeautifiedPathDetails(originPoint, destinationPoint, topCandidates, avoidHighways,
+                    avoidTolls);
             log.info("Routed with {} waypoints ({} removed during self-healing)",
                     routing.getActualWaypoints().size(),
                     topCandidates.size() - routing.getActualWaypoints().size());
@@ -447,13 +447,14 @@ public class RouteBeautifierService {
                 .mapToDouble(s -> s.getDetour() + dwellTimePerStop)
                 .sum();
         double actualEnhancement = baselineDurationMins > 0
-                ? (totalDetourMins / baselineDurationMins) * 100.0 : 0.0;
+                ? (totalDetourMins / baselineDurationMins) * 100.0
+                : 0.0;
         double enhancementBudgetMins = baselineDurationMins * (routeEnhancementThreshold / 100.0);
         String warningMessage = null;
         if (Math.abs(actualEnhancement - routeEnhancementThreshold) > 15) {
             warningMessage = String.format(
                     "Could not meet your enhancement target of %.0f%%. "
-                    + "Delivered %.1f%% enhancement (%.0f of %.0f mins budget used).",
+                            + "Delivered %.1f%% enhancement (%.0f of %.0f mins budget used).",
                     routeEnhancementThreshold, actualEnhancement,
                     totalDetourMins, enhancementBudgetMins);
             log.warn(warningMessage);
@@ -462,7 +463,7 @@ public class RouteBeautifierService {
         // Compute rest stop zones from final polyline
         long rszStart = System.currentTimeMillis();
 
-// Compute rest stop zones from final polyline
+        // Compute rest stop zones from final polyline
         List<Map<String, Double>> restStopZones = new ArrayList<>();
         if (restStopCadence != null && !restStopCadence.equals("none")) {
             String finalPolyline = routing.getPolyline().isEmpty() ? encodedPolyline : routing.getPolyline();
@@ -513,8 +514,7 @@ public class RouteBeautifierService {
                 restStopCadence,
                 routeEnhancementThreshold,
                 warningMessage,
-                restStopZones
-        );
+                restStopZones);
 
         log.info("Total beautifyRoute took {}ms", System.currentTimeMillis() - beautifyStart);
         return dto;
@@ -546,15 +546,12 @@ public class RouteBeautifierService {
             LatLng dest,
             List<ScenicSpot> waypoints,
             boolean avoidHighways,
-            boolean avoidTolls
-    ) throws Exception {
+            boolean avoidTolls) throws Exception {
 
         waypoints.forEach(s -> log.info("Waypoint: {} placeId={}", s.getName(), s.getPlaceId()));
 
-        com.google.maps.model.LatLng googleOrigin
-                = new com.google.maps.model.LatLng(origin.lat, origin.lng);
-        com.google.maps.model.LatLng googleDest
-                = new com.google.maps.model.LatLng(dest.lat, dest.lng);
+        com.google.maps.model.LatLng googleOrigin = new com.google.maps.model.LatLng(origin.lat, origin.lng);
+        com.google.maps.model.LatLng googleDest = new com.google.maps.model.LatLng(dest.lat, dest.lng);
 
         while (!waypoints.isEmpty()) {
             DirectionsApiRequest request = DirectionsApi.newRequest(context)
@@ -575,8 +572,8 @@ public class RouteBeautifierService {
 
             String[] waypointStrings = waypoints.stream()
                     .map(s -> s.getPlaceId() != null && !s.getPlaceId().isEmpty()
-                    ? "place_id:" + s.getPlaceId()
-                    : s.getLat() + "," + s.getLng())
+                            ? "place_id:" + s.getPlaceId()
+                            : s.getLat() + "," + s.getLng())
                     .toArray(String[]::new);
             request.waypoints(waypointStrings);
 
@@ -588,8 +585,7 @@ public class RouteBeautifierService {
                             concatenateLegsPolyline(result.routes[0]),
                             generateDebugUrl(origin, dest, waypoints),
                             processSteps(result),
-                            waypoints
-                    );
+                            waypoints);
                 }
             } catch (com.google.maps.errors.ZeroResultsException e) {
                 // Remove lowest-scoring waypoint and retry
@@ -627,8 +623,7 @@ public class RouteBeautifierService {
                         concatenateLegsPolyline(result.routes[0]),
                         generateDebugUrl(origin, dest, new ArrayList<>()),
                         processSteps(result),
-                        new ArrayList<>()
-                );
+                        new ArrayList<>());
             }
         } catch (Exception ex) {
             log.error("Direct route fallback also failed: {}", ex.getMessage());
@@ -648,8 +643,7 @@ public class RouteBeautifierService {
             List<String> entityPreferences,
             List<CoordinateDto> routeCoords,
             List<String> includeKeywords,
-            List<String> excludeKeywords
-    ) {
+            List<String> excludeKeywords) {
         double totalTimeBudget = originalTripMins * (routeEnhancementThreshold / 100.0);
         int numSegments = Math.max(2, Math.min(10, (int) (totalPathLength / 60.0)));
         double segmentLength = totalPathLength / numSegments;
@@ -686,10 +680,12 @@ public class RouteBeautifierService {
             final double destLng = destinationPoint.lng;
             allFoundSpots = allFoundSpots.stream()
                     .filter(wp -> {
-                        if (excludeOrigin && haversineKm(wp.getLat(), wp.getLng(), originLat, originLng) < EXCLUDE_RADIUS_KM) {
+                        if (excludeOrigin
+                                && haversineKm(wp.getLat(), wp.getLng(), originLat, originLng) < EXCLUDE_RADIUS_KM) {
                             return false;
                         }
-                        if (excludeDest && haversineKm(wp.getLat(), wp.getLng(), destLat, destLng) < EXCLUDE_RADIUS_KM) {
+                        if (excludeDest
+                                && haversineKm(wp.getLat(), wp.getLng(), destLat, destLng) < EXCLUDE_RADIUS_KM) {
                             return false;
                         }
                         return true;
@@ -726,20 +722,18 @@ public class RouteBeautifierService {
         log.info("preferredGoogleTypes: {} hasStrictPrefs={}", preferredGoogleTypes, !preferredGoogleTypes.isEmpty());
 
         // ── Source predicates ─────────────────────────────────────────────────
-        java.util.function.Predicate<ScenicSpot> isUserKW = wp
-                -> "KW-USER".equals(wp.getSearchSource());
-        java.util.function.Predicate<ScenicSpot> isKW = wp
-                -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("KW") && !isUserKW.test(wp);
-        java.util.function.Predicate<ScenicSpot> isNB = wp
-                -> wp.getSearchSource() != null && wp.getSearchSource().startsWith("NB");
-        java.util.function.Predicate<ScenicSpot> isPO = wp
-                -> wp.getSearchSource() == null
+        java.util.function.Predicate<ScenicSpot> isUserKW = wp -> "KW-USER".equals(wp.getSearchSource());
+        java.util.function.Predicate<ScenicSpot> isKW = wp -> wp.getSearchSource() != null
+                && wp.getSearchSource().startsWith("KW") && !isUserKW.test(wp);
+        java.util.function.Predicate<ScenicSpot> isNB = wp -> wp.getSearchSource() != null
+                && wp.getSearchSource().startsWith("NB");
+        java.util.function.Predicate<ScenicSpot> isPO = wp -> wp.getSearchSource() == null
                 || (!wp.getSearchSource().startsWith("KW") && !wp.getSearchSource().startsWith("NB"));
-        java.util.function.Predicate<ScenicSpot> isTypeMatch = wp
-                -> preferredGoogleTypes.contains(wp.getEntityType());
+        java.util.function.Predicate<ScenicSpot> isTypeMatch = wp -> preferredGoogleTypes.contains(wp.getEntityType());
 
         // ── runAnchorPass: finds best anchor per empty segment, clusters companions ──
-        java.util.function.BiConsumer<String, java.util.function.Predicate<ScenicSpot>> runAnchorPass = (passName, anchorFilter) -> {
+        java.util.function.BiConsumer<String, java.util.function.Predicate<ScenicSpot>> runAnchorPass = (passName,
+                anchorFilter) -> {
             log.info("--- {} ---", passName);
 
             // Pass-specific thresholds
@@ -749,9 +743,9 @@ public class RouteBeautifierService {
             // Anchor debug phase label
             String anchorPhase = passName.contains("user") ? "P0"
                     : passName.contains("1.5") ? "P1.5"
-                    : passName.contains("1") ? "P1"
-                    : passName.contains("2") ? "P2"
-                    : "P3";
+                            : passName.contains("1") ? "P1"
+                                    : passName.contains("2") ? "P2"
+                                            : "P3";
 
             // Companion debug phase label
             String companionPhase = anchorPhase + "c";
@@ -767,17 +761,17 @@ public class RouteBeautifierService {
                     break;
                 }
 
-                java.util.function.Predicate<ScenicSpot> inSeg = wp
-                        -> Math.min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg;
+                java.util.function.Predicate<ScenicSpot> inSeg = wp -> Math
+                        .min((int) (wp.getDistFromStart() / segmentLength), numSegments - 1) == seg;
 
                 // Find best anchor for this segment
                 Optional<ScenicSpot> anchorOpt = frozenSpots.stream()
                         .filter(wp -> wp.getRating() >= minRating)
                         .filter(wp -> wp.getUserRatingsTotal() >= minReviews)
                         .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
-                        .filter(wp -> finalSelection.stream().noneMatch(selected
-                        -> selected.getName().equalsIgnoreCase(wp.getName())
-                        && haversineKm(selected.getLat(), selected.getLng(), wp.getLat(), wp.getLng()) < 5.0))
+                        .filter(wp -> finalSelection.stream().noneMatch(selected -> selected.getName()
+                                .equalsIgnoreCase(wp.getName())
+                                && haversineKm(selected.getLat(), selected.getLng(), wp.getLat(), wp.getLng()) < 5.0))
                         .filter(inSeg)
                         .filter(anchorFilter)
                         .max(Comparator.comparingDouble(ScenicSpot::getScore));
@@ -819,7 +813,8 @@ public class RouteBeautifierService {
                             .filter(wp -> wp.getRating() >= 4.3)
                             .filter(wp -> wp.getUserRatingsTotal() >= 500)
                             .filter(wp -> !selectedPlaceIds.contains(wp.getPlaceId()))
-                            .filter(wp -> haversineKm(anchor.getLat(), anchor.getLng(), wp.getLat(), wp.getLng()) <= 10.0)
+                            .filter(wp -> haversineKm(anchor.getLat(), anchor.getLng(), wp.getLat(),
+                                    wp.getLng()) <= 10.0)
                             .filter(tier)
                             .sorted(Comparator.comparingDouble(ScenicSpot::getScore).reversed())
                             .collect(Collectors.toList());
@@ -828,7 +823,8 @@ public class RouteBeautifierService {
                         if (segmentCount[seg] >= 3) {
                             break;
                         }
-                        double gSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop).sum();
+                        double gSpent = finalSelection.stream().mapToDouble(s -> s.getDetour() + dwellTimePerStop)
+                                .sum();
                         if (gSpent >= totalTimeBudget) {
                             break;
                         }
@@ -839,10 +835,9 @@ public class RouteBeautifierService {
 
                         // Skip if same name as anchor or another already-selected spot within 5km
                         boolean isDuplicate = finalSelection.stream()
-                                .anyMatch(selected
-                                        -> selected.getName().equalsIgnoreCase(companion.getName())
-                                && haversineKm(selected.getLat(), selected.getLng(), companion.getLat(), companion.getLng()) < 5.0
-                                );
+                                .anyMatch(selected -> selected.getName().equalsIgnoreCase(companion.getName())
+                                        && haversineKm(selected.getLat(), selected.getLng(), companion.getLat(),
+                                                companion.getLng()) < 5.0);
                         if (isDuplicate) {
                             log.info("  {}: seg={} companion '{}' skipped — duplicate name within 5km",
                                     passName, seg, companion.getName());
@@ -985,7 +980,8 @@ public class RouteBeautifierService {
                     .filter(spot -> {
                         double dist = minDistanceFromPathKm(spot.getLat(), spot.getLng(), routeCoords);
                         if (dist > MAX_CORRIDOR_KM) {
-                            log.info("Corridor filter rejected: {} ({}km off route)", spot.getName(), String.format("%.1f", dist));
+                            log.info("Corridor filter rejected: {} ({}km off route)", spot.getName(),
+                                    String.format("%.1f", dist));
                             return false;
                         }
                         return true;
@@ -1081,20 +1077,22 @@ public class RouteBeautifierService {
             LatLng dest,
             double routeEnhancementThreshold,
             List<String> includeKeywords,
-            List<String> excludeKeywords
-    ) {
+            List<String> excludeKeywords) {
 
-        log.info("findScenicSpotsAlongPath: path size={}, first={},{}, middle={},{}, last={},{}",
+        log.info(
+                "findScenicSpotsAlongPath: path size={}, first={},{}, middle={},{}, last={},{}, routeEnhancementThreshold={}",
                 path.size(),
                 path.get(0).lat, path.get(0).lng,
                 path.get(path.size() / 2).lat, path.get(path.size() / 2).lng,
                 path.get(path.size() - 1).lat, path.get(path.size() - 1).lng);
+        log.info("routeEnhancementThreshold is " + routeEnhancementThreshold);
         List<ScenicSpot> candidates = new ArrayList<>();
         Set<String> seenPlaceIds = new HashSet<>();
         List<ScenicSpot> rawGoogleSpots = new ArrayList<>();
         Map<Integer, Integer> zoneResultCounts = new HashMap<>();
 
-        // Split entity prefs into keyword vs non-keyword types (done once, reused in all passes)
+        // Split entity prefs into keyword vs non-keyword types (done once, reused in
+        // all passes)
         List<String> keywordTypes = entityPreferences.stream()
                 .filter(MeandrConstants.ENTITY_KEYWORDS::containsKey)
                 .collect(Collectors.toList());
@@ -1124,10 +1122,18 @@ public class RouteBeautifierService {
                                 continue;
                             }
 
+                            int minReviews = MIN_REVIEWS.getOrDefault(spot.getEntityType(), 5);
+                            if (spot.getUserRatingsTotal() < minReviews) {
+                                log.info("Pass 0: review count filter rejected: {} ({} reviews, needs {})",
+                                        spot.getName(), spot.getUserRatingsTotal(), minReviews);
+                                continue;
+                            }
+
                             // Filter 1: name must contain at least one include keyword
                             boolean nameMatch = includeKeywords.stream()
                                     .anyMatch(kw -> java.util.Arrays.stream(kw.toLowerCase().split("\\s+"))
-                                    .anyMatch(word -> word.length() > 2 && spot.getName().toLowerCase().contains(word)));
+                                            .anyMatch(word -> word.length() > 2
+                                                    && spot.getName().toLowerCase().contains(word)));
                             if (!nameMatch) {
                                 log.info("Pass 0: name filter rejected: {}", spot.getName());
                                 continue;
@@ -1154,8 +1160,9 @@ public class RouteBeautifierService {
                             }
 
                             seenPlaceIds.add(spot.getPlaceId());
-                            spot.setDistFromStart(haversine(path.get(0).lat, path.get(0).lng, spot.getLat(), spot.getLng()));
-                            spot.setScore(calculateScore(spot, path, totalDist, 10.0, dest));
+                            spot.setDistFromStart(
+                                    haversine(path.get(0).lat, path.get(0).lng, spot.getLat(), spot.getLng()));
+                            calculateDetour(spot, path);
                             spot.setSearchSource("KW-USER");
                             if (DebugConfig.SHOW_SELECTION_DEBUG) {
                                 spot.setSelectionDebugCode("KW-USER");
@@ -1198,7 +1205,7 @@ public class RouteBeautifierService {
         }
 
         // ── Wide radius retry for sparse zones ───────────────────────────────
-        for (int multiplier : new int[]{2, 3}) {
+        for (int multiplier : new int[] { 2, 3 }) {
             odometer = 0;
             lastSearchOdometer = 0;
             for (int i = 0; i < path.size() - 1; i += samplingStep) {
@@ -1247,7 +1254,7 @@ public class RouteBeautifierService {
                 }
                 seenPlaceIds.add(spot.getPlaceId());
                 spot.setDistFromStart(totalDist);
-                spot.setScore(calculateScore(spot, path, totalDist, 10.0, dest));
+                calculateDetour(spot, path);
                 rawGoogleSpots.add(spot);
             }
         }
@@ -1359,7 +1366,8 @@ public class RouteBeautifierService {
             keywordResults.forEach(s -> s.setSearchSource(keywordTag));
         }
 
-        // Merge and post-filter by actual distance — searchText locationBias is a soft hint
+        // Merge and post-filter by actual distance — searchText locationBias is a soft
+        // hint
         // and can return results from anywhere in the country
         double searchRadiusKm = searchRadius / 1000.0;
         List<ScenicSpot> allNearby = Stream.concat(nearbyResults.stream(), keywordResults.stream())
@@ -1412,17 +1420,17 @@ public class RouteBeautifierService {
             if (spot.getSearchSource() != null) {
                 sourceBonus = switch (spot.getSearchSource()) {
                     case "KW", "KW-WR" ->
-                        30.0;
+                        70.0;
                     case "NB", "NB-WR" ->
-                        20.0;
+                        50.0;
                     case "NB-DEST" ->
-                        10.0;
+                        20.0;
                     default ->
                         0.0;
                 };
             }
 
-            spot.setScore(calculateScore(spot, path, totalDist, sourceBonus, dest));
+            calculateDetour(spot, path);
             rawGoogleSpots.add(spot);
             if (DebugConfig.SHOW_SELECTION_DEBUG) {
                 log.info("Qualified spot: {} at {},{} distFromStart={}km source={}",
@@ -1434,10 +1442,7 @@ public class RouteBeautifierService {
         return qualifiedCount;
     }
 
-    private double calculateScore(
-            ScenicSpot spot, List<LatLng> path, double totalDist, double sourceBonus, LatLng dest) {
-
-// Find nearest path point for accurate detour calculation
+    private void calculateDetour(ScenicSpot spot, List<LatLng> path) {
         double minDistKm = Double.MAX_VALUE;
         for (LatLng point : path) {
             double d = haversineKm(spot.getLat(), spot.getLng(), point.lat, point.lng);
@@ -1445,18 +1450,8 @@ public class RouteBeautifierService {
                 minDistKm = d;
             }
         }
-
         int estimatedDetourMins = (int) ((minDistKm * 2.0 / 80.0) * 60.0);
         spot.setDetour(estimatedDetourMins);
-
-        double baseRating = spot.getRating() > 0 ? spot.getRating() : 2.5;
-        double ratingScore = Math.max(0, (baseRating - 2.5) / 2.5 * 60.0);
-        double popularityScore = Math.min(30.0, Math.log10(spot.getUserRatingsTotal() + 1) / Math.log10(100000) * 30.0);
-        double distToDest = haversineKm(spot.getLat(), spot.getLng(), dest.lat, dest.lng);
-        double arrivalBonus = (1.0 - (distToDest / totalDist)) * 5.0;
-        double detourPenalty = estimatedDetourMins * 0.2;
-        double score = ratingScore + popularityScore + arrivalBonus + sourceBonus - detourPenalty;
-        return Math.max(0, score);
     }
 
     /**
@@ -1465,7 +1460,7 @@ public class RouteBeautifierService {
      * evenly (e.g. ~12km for a 600km route).
      */
     private boolean isSpaceAvailable(List<ScenicSpot> existing, ScenicSpot candidate, double totalPathLengthKm) {
-        double minDistKm = Math.min(30.0, Math.max(1.5, totalPathLengthKm / 50.0));  // ← cap at 30km
+        double minDistKm = Math.min(30.0, Math.max(1.5, totalPathLengthKm / 50.0)); // ← cap at 30km
         for (ScenicSpot s : existing) {
             double dist = haversine(s.getLat(), s.getLng(), candidate.getLat(), candidate.getLng());
             if (dist < minDistKm) {
@@ -1508,7 +1503,7 @@ public class RouteBeautifierService {
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }
@@ -1519,7 +1514,7 @@ public class RouteBeautifierService {
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
@@ -1536,11 +1531,11 @@ public class RouteBeautifierService {
         if (waypoints != null && !waypoints.isEmpty()) {
             String waypointStr = waypoints.stream()
                     .map(w -> (w.getName() + ", " + w.getAddress())
-                    .replace(" ", "+")
-                    .replace(",", "%2C")
-                    .replace("&", "%26")
-                    .replace("(", "%28")
-                    .replace(")", "%29"))
+                            .replace(" ", "+")
+                            .replace(",", "%2C")
+                            .replace("&", "%26")
+                            .replace("(", "%28")
+                            .replace(")", "%29"))
                     .collect(Collectors.joining("|"));
             url.append("&waypoints=").append(waypointStr);
         }
@@ -1573,8 +1568,7 @@ public class RouteBeautifierService {
                     RouteStepSummaryDto stepDto = new RouteStepSummaryDto(
                             step.htmlInstructions,
                             step.distance.humanReadable,
-                            step.duration.humanReadable
-                    );
+                            step.duration.humanReadable);
                     steps.add(stepDto);
                 }
             }

@@ -106,7 +106,6 @@ public class WaypointScoringService {
         
         log.info("Scoring Google Places ...");
 
-        // Find max raw quality for normalization
         double maxRaw = candidates.stream()
                 .mapToDouble(c -> rawGoogleQuality(c))
                 .max().orElse(1.0);
@@ -116,10 +115,15 @@ public class WaypointScoringService {
             double quality  = (rawGoogleQuality(c) / Math.max(maxRaw, 0.001)) * 70.0;
             double prefBonus = prefBonus(c.getEntityType(), prefWeights, 20.0);
             double penalty  = detourPenalty(c.getDetourMinutes());
-            double score    = Math.min(100, quality + prefBonus - penalty);
+            double sourceBonus = switch (c.getSearchSource() != null ? c.getSearchSource() : "") {
+                case "KW", "KW-WR", "KW-USER" -> 70.0;
+                case "NB", "NB-WR" -> 50.0;
+                case "NB-DEST" -> 20.0;
+                default -> 0.0;
+            };
+            double score    = Math.min(200, quality + prefBonus + sourceBonus - penalty);
             
-            
-            log.debug("Google place: " + c.getName() + " overall meandr score: " + score + " quality = " + quality + " prefBonus = " + prefBonus + " penalty = " + penalty);
+            log.debug("Google place: " + c.getName() + " overall meandr score: " + score + " quality = " + quality + " prefBonus = " + prefBonus + " sourceBonus = " + sourceBonus + " penalty = " + penalty);
 
             result.add(ScoredWaypoint.fromGoogle(c, score));
         }
